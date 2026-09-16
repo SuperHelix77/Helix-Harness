@@ -80,6 +80,8 @@ Managed runtime is Unsloth `2026.9.5`. Applying the rebuilt app's bundled overla
 
 Full v2 acceptance details are in `docs/helix-harness-v2-validation-20260916.md`.
 
+The original Jev/Empryo/self-audit → Hermes plan was re-audited against current HEAD on 2026-09-17. See `docs/helix-adaptive-cycle-conformance-20260917.md`. The closed-loop safety/adaptation core is implemented, but cache telemetry breadth, online decision-controller wiring/calibration, counterfactual candidate formalization, and matched telemetry-overhead measurement remain partial.
+
 ## Remaining evidence boundaries
 
 1. Native Tauri GUI updater orchestration has not yet been driven through another destructive live update after the v2 changes. Component overwrite/reapply behavior is proven; do not upgrade that to strongest-form GUI updater proof without running it.
