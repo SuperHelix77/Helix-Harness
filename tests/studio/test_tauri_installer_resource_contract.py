@@ -65,6 +65,9 @@ def test_macos_bundle_carries_the_exact_helix_backend_contract() -> None:
     assert '_apply_helix_backend_overlay' in installer
     applier = (REPO / "scripts/apply_helix_backend_overlay.py").read_text(encoding="utf-8")
     assert 'helix.adaptive.backend.v1' in applier
+    assert 'mem0ai>=2.0.20,<3.0' in applier
+    assert 'optional Mem0 runtime' in applier
+    assert 'check=False' in applier
     update_rs = (REPO / "studio/src-tauri/src/update.rs").read_text(encoding="utf-8")
     assert 'apply_bundled_helix_backend_overlay' in update_rs
 

@@ -317,19 +317,51 @@ def search(subject: str | None, query: str, limit: int = 5) -> dict[str, Any]:
     vector_ok = False
     try:
         memory = _instance()
-        found = memory.search(query, user_id=_user_id(subject), limit=cap)
-        if isinstance(found, list):
-            results.extend(found)
+        user_id = _user_id(subject)
+        try:
+            # Mem0 2.x moved entity selectors under ``filters``.  Keep a
+            # narrow fallback for older installations rather than treating an
+            # API-shape mismatch as vector-memory unavailability.
+            found = memory.search(query, filters={"user_id": user_id}, limit=cap)
+        except (TypeError, ValueError) as error:
+            text = str(error)
+            if "filters" not in text and "Top-level entity parameters" not in text:
+                raise
+            found = memory.search(query, user_id=user_id, limit=cap)
+        if isinstance(found, dict):
+            vector_rows = found.get("results")
+            if isinstance(vector_rows, list):
+                results.extend(item for item in vector_rows if isinstance(item, dict))
+                vector_ok = True
+        elif isinstance(found, list):
+            results.extend(item for item in found if isinstance(item, dict))
             vector_ok = True
     except Exception:
         vector_ok = False
     graph_hits = _graph_search(query, cap)
-    seen = {str(item.get("id") or item.get("memory") or "") for item in results if isinstance(item, dict)}
+
+    def _keys(item: dict[str, Any]) -> set[str]:
+        keys: set[str] = set()
+        item_id = str(item.get("id") or "").strip()
+        if item_id:
+            keys.add(f"id:{item_id}")
+        text = str(item.get("memory") or item.get("text") or "").strip()
+        if text:
+            # Vector Mem0 and the bounded graph intentionally store the same
+            # experience for fail-open redundancy. Do not spend two recall slots
+            # on byte-equivalent copies merely because the stores use different ids.
+            keys.add("text:" + " ".join(text.casefold().split()))
+        return keys
+
+    seen: set[str] = set()
+    for item in results:
+        if isinstance(item, dict):
+            seen.update(_keys(item))
     for hit in graph_hits:
-        key = str(hit.get("id") or hit.get("memory") or "")
-        if key and key in seen:
+        keys = _keys(hit)
+        if keys and keys.intersection(seen):
             continue
         results.append(hit)
-        seen.add(key)
+        seen.update(keys)
     available = vector_ok or bool(graph_hits)
     return {"results": results[:cap], "available": available}

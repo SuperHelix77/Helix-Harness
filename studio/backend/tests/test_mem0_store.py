@@ -30,6 +30,7 @@ def test_mem0_is_account_scoped_and_supplementary(monkeypatch):
     assert found["available"] is True
     assert found["results"][0]["memory"] == "repeatable procedure"
     assert fake.search_calls[0][1]["limit"] == 10
+    assert fake.search_calls[0][1]["filters"]["user_id"].startswith("unsloth-")
 
 
 def test_mem0_graph_persists_nodes_and_links_without_dumping_secrets(tmp_path, monkeypatch):
@@ -52,3 +53,46 @@ def test_mem0_graph_persists_nodes_and_links_without_dumping_secrets(tmp_path, m
     found = mem0_store.search("alice@example.test", "Qwen3.8 KV", limit = 5)
     assert found["available"] is True
     assert any("q4_0" in str(item).lower() for item in found["results"])
+
+
+class _FakeMemoryV2:
+    def search(self, _query, **kwargs):
+        assert "user_id" not in kwargs
+        assert kwargs["filters"]["user_id"].startswith("unsloth-")
+        return {
+            "results": [
+                {
+                    "id": "v2-memory",
+                    "memory": "vector-backed result",
+                    "metadata": {"thread_id": "thread-v2"},
+                    "score": 0.9,
+                }
+            ]
+        }
+
+
+def test_mem0_v2_structured_search_results_are_used(monkeypatch):
+    monkeypatch.setattr(mem0_store, "_instance", lambda: _FakeMemoryV2())
+    monkeypatch.setattr(mem0_store, "_graph_search", lambda *_args, **_kwargs: [])
+    found = mem0_store.search("alice@example.test", "vector result", limit=3)
+    assert found["available"] is True
+    assert found["results"][0]["id"] == "v2-memory"
+    assert found["results"][0]["memory"] == "vector-backed result"
+
+
+def test_vector_and_graph_copies_of_same_memory_consume_one_slot(monkeypatch):
+    class _Vector:
+        def search(self, _query, **_kwargs):
+            return {"results": [{"id": "vector-1", "memory": "Same durable memory", "score": 0.8}]}
+
+    monkeypatch.setattr(mem0_store, "_instance", lambda: _Vector())
+    monkeypatch.setattr(
+        mem0_store,
+        "_graph_search",
+        lambda *_args, **_kwargs: [
+            {"id": "graph-1", "memory": "Same durable memory", "source": "mem0-graph"},
+            {"id": "graph-2", "memory": "Different fallback memory", "source": "mem0-graph"},
+        ],
+    )
+    found = mem0_store.search("alice@example.test", "durable memory", limit=5)
+    assert [item["id"] for item in found["results"]] == ["vector-1", "graph-2"]

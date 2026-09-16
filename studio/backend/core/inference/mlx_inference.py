@@ -12,6 +12,7 @@ import threading
 import time
 from collections import OrderedDict
 from contextlib import ExitStack, contextmanager, nullcontext
+from pathlib import Path
 from typing import Optional, Generator
 from core.inference.message_content import content_to_text
 from core.inference.native_tool_tokens import (
@@ -4378,15 +4379,140 @@ class MLXInferenceBackend:
         if stopped:
             self._mark_stopped()
 
+    def _unwrap_loaded_adapter_locked(self) -> None:
+        """Replace MLX LoRA wrappers with their retained base modules.
+
+        Caller holds ``_generation_lock``. mlx-lm wrappers keep the original
+        linear/embedding module inside the adapter, so this is a true resident
+        base restore: no checkpoint reload and no second copy of the base model.
+        """
+        if self._model is None:
+            return
+        adapters, unsupported = _mlx_adapter_modules(self._model)
+        if unsupported:
+            raise RuntimeError(
+                "Unsloth MLX: cannot hot-revert adapter wrappers without retained base modules: "
+                + ", ".join(unsupported[:5])
+            )
+        if not adapters:
+            return
+        from mlx.utils import tree_unflatten
+
+        self._model.update_modules(
+            tree_unflatten([(path, base) for path, _, base in adapters])
+        )
+
+    def load_adapter(self, base_model_name: str, adapter_path: str, adapter_name: str) -> bool:
+        """Attach one MLX LoRA adapter to the resident base model.
+
+        MLX supports one active adapter tree at a time. Replacing an adapter
+        unwraps the previous wrappers first while retaining the base weights.
+        """
+        if not self.active_model_name or base_model_name != self.active_model_name:
+            logger.error(
+                "MLX adapter hot-swap base mismatch: requested=%r active=%r",
+                base_model_name,
+                self.active_model_name,
+            )
+            return False
+        path = Path(adapter_path).expanduser()
+        if not path.is_dir() or not (path / "adapter_config.json").is_file():
+            logger.error("MLX adapter hot-swap path is invalid: %s", path)
+            return False
+        if not (path / "adapters.safetensors").is_file():
+            logger.error("MLX adapter hot-swap requires adapters.safetensors: %s", path)
+            return False
+
+        with self._generation_lock:
+            self._model_fusion.close()
+            self._model_fusion = ExitStack()
+            self._clear_prompt_cache()
+            try:
+                self._unwrap_loaded_adapter_locked()
+                from mlx_lm.tuner.utils import load_adapters
+
+                updated = load_adapters(self._model, str(path))
+                if updated is not None:
+                    self._model = updated
+                info = self.models.get(base_model_name)
+                if info is None:
+                    raise RuntimeError("The active MLX model disappeared during adapter hot-swap")
+                info["model"] = self._model
+                info["active_adapter"] = adapter_name
+                info.setdefault("loaded_adapters", {})[adapter_name] = str(path)
+                info["is_lora"] = True
+                logger.info(
+                    "MLX adapter '%s' hot-swapped onto resident base '%s'",
+                    adapter_name,
+                    base_model_name,
+                )
+                return True
+            except Exception as error:
+                logger.error("MLX adapter hot-swap failed: %s", error, exc_info=True)
+                # load_adapters may already have installed wrappers before a
+                # shape/weight failure. Unwrap them to recover the retained base.
+                try:
+                    self._unwrap_loaded_adapter_locked()
+                    info = self.models.get(base_model_name)
+                    if info is not None:
+                        info["model"] = self._model
+                        info["active_adapter"] = None
+                        info["is_lora"] = False
+                    if self._model is not None and not self._is_vlm:
+                        self._model_fusion.enter_context(_mlx_fused_moe_gate_up(self._model))
+                except Exception:
+                    logger.exception("MLX adapter rollback after failed hot-swap also failed")
+                return False
+
+    def set_active_adapter(self, base_model_name: str, adapter_name: str) -> bool:
+        """Confirm the single MLX adapter attached by ``load_adapter`` is active."""
+        if base_model_name != self.active_model_name:
+            return False
+        info = self.models.get(base_model_name) or {}
+        return info.get("active_adapter") == adapter_name
+
+    def revert_to_base_model(self, base_model_name: str) -> bool:
+        """Permanently unwrap the active MLX adapter, retaining base weights."""
+        if not self.active_model_name or base_model_name != self.active_model_name:
+            return False
+        with self._generation_lock:
+            try:
+                self._model_fusion.close()
+                self._model_fusion = ExitStack()
+                self._clear_prompt_cache()
+                self._unwrap_loaded_adapter_locked()
+                info = self.models.get(base_model_name)
+                if info is not None:
+                    info["model"] = self._model
+                    info["active_adapter"] = None
+                    info["is_lora"] = False
+                if self._model is not None and not self._is_vlm:
+                    self._model_fusion.enter_context(_mlx_fused_moe_gate_up(self._model))
+                logger.info("MLX reverted to resident base weights: %s", base_model_name)
+                return True
+            except Exception as error:
+                logger.error("MLX adapter revert failed: %s", error, exc_info=True)
+                return False
+
     def generate_with_adapter_control(
         self,
         use_adapter = None,
         cancel_event = None,
         **gen_kwargs,
     ) -> Generator[str, None, None]:
+        adapter_state = use_adapter
+        if isinstance(use_adapter, str):
+            info = self.models.get(self.active_model_name) or {}
+            active_name = info.get("active_adapter")
+            if use_adapter != active_name:
+                raise NotImplementedError(
+                    "Unsloth MLX: only the currently hot-swapped adapter may be "
+                    f"selected by name (requested={use_adapter!r}, active={active_name!r})."
+                )
+            adapter_state = True
         yield from self.generate_chat_response(
             cancel_event = cancel_event,
-            _adapter_state = use_adapter,
+            _adapter_state = adapter_state,
             **gen_kwargs,
         )
 

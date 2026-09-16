@@ -24,11 +24,17 @@ export type SelfTrainingState = {
   minExamples: number;
   maxSeqLength: number;
   baseModelId: string | null;
+  baseServingModelId?: string | null;
   baseSnapshotPath: string | null;
+  baseServingSnapshotPath?: string | null;
   baseContextLength: number | null;
   activeAdapterPath: string | null;
+  activeServingModelId?: string | null;
+  lastCandidateAdapterPath?: string | null;
+  candidateQualifiedOnly?: boolean;
   datasetPath: string;
   exampleCount: number;
+  eligibleExampleCount?: number;
   status: string;
   lastJobId: string | null;
   lastEvaluation: SelfTrainingEvaluation | null;

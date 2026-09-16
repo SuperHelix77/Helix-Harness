@@ -180,7 +180,10 @@ studio = [
 # Qdrant + HuggingFace embeddings and keeps the bounded JSON ledger as a
 # fallback when this extra is not installed.
 memory = [
-    "mem0ai>=0.1.118,<1.0",
+    # Mem0 2.x supports the OpenAI 3.x runtime shipped by current Studio.
+    # The old <1.0 pin forced OpenAI/protobuf downgrades that broke unrelated
+    # inference integrations before memory even initialized.
+    "mem0ai>=2.0.20,<3.0",
 ]
 
 triton = [

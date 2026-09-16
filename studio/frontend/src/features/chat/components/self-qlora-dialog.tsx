@@ -94,13 +94,16 @@ export function SelfQloraDialog(): ReactElement {
         setState(next);
         setLearningState(nextLearning);
         if (!modelId && next.baseModelId) setModelId(next.baseModelId);
+        if (!candidatePath && next.lastCandidateAdapterPath) {
+          setCandidatePath(next.lastCandidateAdapterPath);
+        }
       })
       .catch((error) =>
         toast.error("Could not load self-QLoRA", {
           description: error instanceof Error ? error.message : undefined,
         }),
       );
-  }, [modelId]);
+  }, [candidatePath, modelId]);
 
   useEffect(() => {
     const openManager = () => {
@@ -299,8 +302,13 @@ export function SelfQloraDialog(): ReactElement {
           <section className="grid gap-2">
             <h3 className="font-medium">Immutable original baseline</h3>
             <p className="text-xs text-muted-foreground">
-              Save the exact model ID and optional local snapshot before training. This pointer is never overwritten.
+              The trainable source and the serving checkpoint are tracked separately. A GGUF serving model is never passed to the PEFT/MLX trainer.
             </p>
+            {state.baseServingModelId && state.baseServingModelId !== state.baseModelId ? (
+              <p className="text-xs text-muted-foreground">
+                Serving: <span className="font-mono">{state.baseServingModelId}</span> · trainable source: <span className="font-mono">{state.baseModelId}</span>
+              </p>
+            ) : null}
             <Input value={modelId} onChange={(event) => setModelId(event.target.value)} placeholder="Model ID (for example Qwen3.8-27B)" />
             <Input value={snapshotPath} onChange={(event) => setSnapshotPath(event.target.value)} placeholder="Optional local base snapshot path" />
             <div className="flex gap-2">
@@ -312,7 +320,9 @@ export function SelfQloraDialog(): ReactElement {
           <section className="grid gap-2 rounded-xl border border-border/70 bg-muted/20 p-3">
             <div className="flex items-center justify-between gap-2">
               <h3 className="font-medium">Task dataset</h3>
-              <span className="text-xs text-muted-foreground">{state.exampleCount} / 256 examples · {state.status}</span>
+              <span className="text-xs text-muted-foreground">
+                {state.exampleCount} / 256 examples · {state.eligibleExampleCount ?? 0} verified · {state.status}
+              </span>
             </div>
             <p className="break-all text-xs text-muted-foreground">{state.datasetPath || "Dataset path will appear after the backend is ready."}</p>
             {state.lastRecommendation ? (
@@ -323,6 +333,12 @@ export function SelfQloraDialog(): ReactElement {
             ) : (
               <p className="text-xs text-muted-foreground">After a task, use /learn to decide whether a reusable skill is enough. QLoRA is reserved for repeated, measurable gaps.</p>
             )}
+            {state.lastCandidateAdapterPath ? (
+              <p className="break-all text-xs text-muted-foreground">Latest candidate: {state.lastCandidateAdapterPath}</p>
+            ) : null}
+            {state.activeServingModelId ? (
+              <p className="text-xs text-muted-foreground">Active adapted serving model: {state.activeServingModelId}</p>
+            ) : null}
             {state.lastError ? <p className="text-xs text-destructive">{state.lastError}</p> : null}
             <div className="flex justify-end">
               <Button disabled={busy || !state.enabled} onClick={() => void apply(startSelfTraining, "Self-QLoRA queued")}>Train now</Button>

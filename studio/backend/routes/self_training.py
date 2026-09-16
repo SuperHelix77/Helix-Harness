@@ -5,8 +5,9 @@
 
 Completed local chat turns can be collected as ChatML examples. The original
 model identity is retained as the baseline and adapter promotion is gated by an
-explicit score comparison. This route never overwrites the base model and does
-not auto-promote a newly trained adapter.
+explicit held-out score/throughput comparison. This route never overwrites the
+base model. Autonomous promotion is allowed only after a Hermes-qualified run,
+under the user's explicit autonomous + QLoRA policy gates.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ from pydantic import BaseModel, Field
 
 from auth.authentication import get_current_subject
 from models.training import TrainingStartRequest
-from utils.paths import account_path, ensure_dir
+from utils.paths import account_path, datasets_root, ensure_dir
 
 router = APIRouter()
 
@@ -143,15 +144,23 @@ def _empty_state() -> dict[str, Any]:
         "minExamples": 8,
         "maxSeqLength": 8_192,
         "baseModelId": None,
+        # The checkpoint serving chat can be a GGUF quant while the trainable
+        # source remains safetensors/MLX. Keep both identities explicit so an
+        # automatically collected turn never feeds a .gguf path to PEFT.
+        "baseServingModelId": None,
         "baseSnapshotPath": None,
+        "baseServingSnapshotPath": None,
         "baseContextLength": None,
         "activeAdapterPath": None,
         "examples": [],
         "status": "idle",
         "lastJobId": None,
+        "lastCandidateAdapterPath": None,
         "lastEvaluation": None,
         "lastRecommendation": None,
         "trainingQualifiedOnly": False,
+        "candidateQualifiedOnly": False,
+        "activeServingModelId": None,
         "activeDatasetSnapshot": None,
         "activeDatasetSha256": None,
         "activeDatasetExampleCount": 0,
@@ -159,6 +168,109 @@ def _empty_state() -> dict[str, Any]:
         "lastRecovery": None,
         "updatedAt": int(time.time() * 1_000),
     }
+
+
+def _strip_gguf_repo_suffix(repo_id: str) -> str:
+    """Map a canonical Hub GGUF distribution repo to its trainable source id."""
+    value = str(repo_id or "").strip()
+    if value.casefold().endswith("-gguf"):
+        return value[:-5]
+    return value
+
+
+def _hf_repo_from_cache_path(path: Path) -> str | None:
+    """Recover ``owner/repo`` from a standard Hugging Face cache path."""
+    for part in path.parts:
+        if not part.startswith("models--"):
+            continue
+        encoded = part[len("models--") :]
+        if "--" not in encoded:
+            continue
+        owner, repo = encoded.split("--", 1)
+        if owner and repo:
+            return f"{owner}/{repo}"
+    return None
+
+
+def _trainable_baseline_for_serving_model(model_id: str) -> str:
+    """Resolve a serving checkpoint to the safest trainable baseline identity.
+
+    Normal model ids are returned unchanged. A ``*-GGUF`` Hub id, or a local
+    GGUF living in Hugging Face's cache, maps narrowly to the corresponding
+    source repo by removing only the terminal ``-GGUF`` suffix. Unknown local
+    GGUF files remain unchanged and the training preflight rejects them rather
+    than guessing a source model.
+    """
+    raw = str(model_id or "").strip()
+    if not raw:
+        return raw
+
+    path = Path(raw).expanduser()
+    if "/" in raw and not path.exists():
+        return _strip_gguf_repo_suffix(raw)
+    original_is_gguf = path.suffix.casefold() == ".gguf"
+    try:
+        resolved = path.resolve(strict=True)
+    except (OSError, FileNotFoundError):
+        return _strip_gguf_repo_suffix(raw)
+    if not original_is_gguf and resolved.suffix.casefold() != ".gguf":
+        return raw
+    # Snapshot entries are normally symlinks into an extensionless blobs/ file,
+    # so inspect both the caller-visible cache path and its resolved target.
+    repo = _hf_repo_from_cache_path(path) or _hf_repo_from_cache_path(resolved)
+    if repo and repo.casefold().endswith("-gguf"):
+        return _strip_gguf_repo_suffix(repo)
+    return raw
+
+
+def _serving_model_matches_baseline(state: dict[str, Any], serving_model_id: str) -> bool:
+    baseline = str(state.get("baseModelId") or "").strip()
+    serving = str(serving_model_id or "").strip()
+    if not baseline:
+        return True
+    if serving == baseline:
+        return True
+    if serving == str(state.get("baseServingModelId") or "").strip():
+        return True
+    return _trainable_baseline_for_serving_model(serving) == baseline
+
+
+def _example_matches_baseline(example: dict[str, Any], baseline: str) -> bool:
+    serving = str(example.get("modelId") or "").strip()
+    trainable = str(example.get("trainableBaseModelId") or "").strip()
+    return bool(
+        baseline
+        and (
+            trainable == baseline
+            or serving == baseline
+            or _trainable_baseline_for_serving_model(serving) == baseline
+        )
+    )
+
+
+def _migrate_trainable_baseline(state: dict[str, Any]) -> bool:
+    """Upgrade legacy state that stored a GGUF serving id as the trainable base."""
+    legacy = str(state.get("baseModelId") or "").strip()
+    if not legacy:
+        return False
+    trainable = _trainable_baseline_for_serving_model(legacy)
+    if not trainable or trainable == legacy:
+        return False
+    state["baseModelId"] = trainable
+    if not state.get("baseServingModelId"):
+        state["baseServingModelId"] = legacy
+    if state.get("baseSnapshotPath") and not state.get("baseServingSnapshotPath"):
+        state["baseServingSnapshotPath"] = state.get("baseSnapshotPath")
+    # A GGUF snapshot cannot be reused by the PEFT/MLX trainer. Let the normal
+    # model resolver locate/cache the trainable source instead.
+    state["baseSnapshotPath"] = None
+    for item in state.get("examples", []):
+        if not isinstance(item, dict) or item.get("trainableBaseModelId"):
+            continue
+        serving = str(item.get("modelId") or "").strip()
+        if _trainable_baseline_for_serving_model(serving) == trainable:
+            item["trainableBaseModelId"] = trainable
+    return True
 
 
 def _read_state() -> dict[str, Any]:
@@ -175,6 +287,7 @@ def _read_state() -> dict[str, Any]:
         if key in raw:
             state[key] = raw[key]
     state["examples"] = [item for item in state.get("examples", []) if isinstance(item, dict)][-_MAX_EXAMPLES:]
+    _migrate_trainable_baseline(state)
     return state
 
 
@@ -248,6 +361,106 @@ def _training_runtime_snapshot() -> tuple[str | None, bool | None]:
         return None, None
 
 
+def _training_terminal_snapshot(expected_job_id: str | None = None) -> dict[str, Any] | None:
+    """Read terminal training evidence without attaching a foreign job."""
+    try:
+        from core.training import get_training_backend
+
+        backend = get_training_backend()
+        job_id = str(getattr(backend, "current_job_id", "") or "")
+        if expected_job_id and job_id != expected_job_id:
+            return None
+        progress = backend.trainer.training_progress
+        output_dir = getattr(progress, "output_dir", None) or getattr(backend, "_output_dir", None)
+        return {
+            "job_id": job_id or None,
+            "active": bool(backend.is_training_active()),
+            "completed": bool(getattr(progress, "is_completed", False)),
+            "error": str(getattr(progress, "error", "") or "") or None,
+            "output_dir": str(output_dir) if output_dir else None,
+            "message": str(getattr(progress, "status_message", "") or ""),
+        }
+    except Exception:
+        return None
+
+
+def _candidate_artifact_path(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    path = Path(str(raw)).expanduser()
+    try:
+        resolved = path.resolve(strict=True)
+    except (OSError, FileNotFoundError):
+        return None
+    if not resolved.is_dir():
+        return None
+    if not (resolved / "adapter_config.json").is_file():
+        return None
+    # MLX saves ``adapters.safetensors``; PEFT/Transformers conventionally saves
+    # ``adapter_model.safetensors``. The later backend-specific hot-swap performs
+    # the strict format check; completion recovery only needs to know a real
+    # adapter artifact exists.
+    if not any(
+        (resolved / name).is_file()
+        for name in ("adapters.safetensors", "adapter_model.safetensors", "adapter_model.bin")
+    ):
+        return None
+    return str(resolved)
+
+
+def _autonomous_candidate_benchmark_allowed(state: dict[str, Any]) -> bool:
+    if state.get("candidateQualifiedOnly") is not True or not state.get("enabled", True):
+        return False
+    try:
+        from routes.learning import _read_state as _read_learning_state
+
+        learning = _read_learning_state()
+    except Exception:
+        return False
+    return (
+        learning.get("decisionMode") == "autonomous"
+        and learning.get("allowQloraTraining") is True
+    )
+
+
+def _record_completed_candidate(
+    state: dict[str, Any],
+    *,
+    job_id: str,
+    output_dir: str,
+    qualified_only: bool,
+) -> bool:
+    candidate = _candidate_artifact_path(output_dir)
+    if candidate is None:
+        state["status"] = "error"
+        state["lastError"] = "Self-QLoRA completed but no valid adapter artifact was produced."
+        state["trainingQualifiedOnly"] = False
+        state["candidateQualifiedOnly"] = False
+        return False
+    state["status"] = "candidate-ready"
+    state["lastCandidateAdapterPath"] = candidate
+    state["lastError"] = None
+    state["trainingQualifiedOnly"] = False
+    state["candidateQualifiedOnly"] = bool(qualified_only)
+    state["lastRecovery"] = {
+        "kind": "training-completed",
+        "persistedJobId": job_id,
+        "candidateAdapterPath": candidate,
+        "recoveredAt": int(time.time() * 1_000),
+    }
+    return True
+
+
+def _queue_candidate_benchmark_if_allowed(state: dict[str, Any]) -> str | None:
+    if state.get("status") != "candidate-ready":
+        return None
+    candidate = _candidate_artifact_path(state.get("lastCandidateAdapterPath"))
+    if candidate is None or not _autonomous_candidate_benchmark_allowed(state):
+        return None
+    state["status"] = "benchmark-queued"
+    return candidate
+
+
 def _reconcile_persisted_training_state(state: dict[str, Any]) -> tuple[bool, bool]:
     """Reconcile crash-persisted queued/training states with the live worker.
 
@@ -257,6 +470,24 @@ def _reconcile_persisted_training_state(state: dict[str, Any]) -> tuple[bool, bo
     an explicit error with provenance instead of permanently blocking /start.
     """
     status = str(state.get("status") or "")
+    if status in {"benchmark-queued", "benchmark-loading-base", "benchmarking"}:
+        candidate = _candidate_artifact_path(state.get("lastCandidateAdapterPath"))
+        if candidate is None:
+            state["status"] = "error"
+            state["lastError"] = "Recovered an interrupted benchmark but its candidate adapter is missing."
+            state["candidateQualifiedOnly"] = False
+        else:
+            # Benchmarking is deterministic and reversible. Return to the durable
+            # candidate-ready boundary; get_self_training will requeue it only if
+            # the CURRENT autonomous policy still permits QLoRA.
+            state["status"] = "candidate-ready"
+            state["lastError"] = None
+            state["lastRecovery"] = {
+                "kind": "interrupted-benchmark-recovered",
+                "candidateAdapterPath": candidate,
+                "recoveredAt": int(time.time() * 1_000),
+            }
+        return True, False
     if status not in {"queued", "training"}:
         return False, False
     live_job_id, live_active = _training_runtime_snapshot()
@@ -268,10 +499,32 @@ def _reconcile_persisted_training_state(state: dict[str, Any]) -> tuple[bool, bo
     if status == "training":
         if live_active and persisted_job_id and live_job_id == persisted_job_id:
             return False, False
+        terminal = _training_terminal_snapshot(persisted_job_id) if persisted_job_id else None
+        if terminal is not None and terminal.get("completed") is True:
+            output_dir = str(terminal.get("output_dir") or "")
+            _record_completed_candidate(
+                state,
+                job_id=persisted_job_id,
+                output_dir=output_dir,
+                qualified_only=state.get("trainingQualifiedOnly") is True,
+            )
+            return True, False
+        if terminal is not None and terminal.get("error"):
+            state["status"] = "error"
+            state["lastError"] = str(terminal["error"])[:2_000]
+            state["lastRecovery"] = {
+                "kind": "training-error-observed",
+                "persistedJobId": persisted_job_id or None,
+                "runtimeJobId": terminal.get("job_id"),
+                "runtimeActive": False,
+                "recoveredAt": now,
+            }
+            state["trainingQualifiedOnly"] = False
+            return True, False
         state["status"] = "error"
         state["lastError"] = (
             "Recovered stale self-QLoRA training state: the persisted job is not active "
-            "in this process. Start a new run after reviewing the preserved dataset provenance."
+            "and no matching terminal completion receipt is available in this process."
         )
         state["lastRecovery"] = {
             "kind": "stale-training",
@@ -371,7 +624,7 @@ def _snapshot_training_dataset(
     examples = _qualified_examples(state) if qualified_only else list(state.get("examples", []))
     payload = "".join(_training_row(example) for example in examples).encode("utf-8")
     digest = hashlib.sha256(payload).hexdigest()
-    run_dir = account_path("learning/self_qlora/runs")
+    run_dir = datasets_root() / "helix-self-qlora-runs"
     ensure_dir(run_dir)
     path = run_dir / f"dataset-{int(time.time() * 1_000)}-{uuid.uuid4().hex[:12]}-{digest[:12]}.jsonl"
     # Exclusive create: no later collection path ever opens this filename for writing.
@@ -515,6 +768,168 @@ def _run_holdout(backend: Any, use_adapter: str | bool) -> tuple[float, float, b
     )
 
 
+async def _ensure_trainable_base_for_benchmark(subject: str) -> tuple[Any, bool]:
+    """Return the inference backend with the trainable base resident.
+
+    Training may evict inference to free unified memory. Autonomous evaluation
+    therefore reloads the trainable source through the same production load gate
+    as ordinary chat. The boolean says whether this helper performed the load so
+    a rejected candidate can leave no hidden serving-model change behind.
+    """
+    from core.inference import get_inference_backend
+
+    with _STATE_LOCK:
+        state = _read_state()
+        base_model = str(state.get("baseModelId") or "").strip()
+        context_length = int(state.get("baseContextLength") or state.get("maxSeqLength") or 8_192)
+    if not base_model:
+        raise RuntimeError("Self-QLoRA has no trainable base model for benchmarking.")
+    backend = get_inference_backend()
+    if str(getattr(backend, "active_model_name", "") or "") == base_model:
+        return backend, False
+
+    from models.inference import LoadRequest
+    from routes.inference import load_model_gated
+
+    await load_model_gated(
+        LoadRequest(
+            model_path=base_model,
+            max_seq_length=max(512, min(context_length, 65_536)),
+            load_in_4bit=True,
+        ),
+        None,
+        subject,
+        user_initiated=False,
+    )
+    backend = get_inference_backend()
+    if str(getattr(backend, "active_model_name", "") or "") != base_model:
+        raise RuntimeError("The trainable base did not become the active inference model.")
+    return backend, True
+
+
+async def _benchmark_completed_candidate(subject: str, candidate_path: str) -> None:
+    """Run objective post-training acceptance under the current policy.
+
+    A rejected candidate is reverted and, when this helper had to load the source
+    model solely for evaluation, that source model is unloaded again. This lets
+    the next normal chat reload the user's selected serving GGUF instead of
+    silently replacing it with the training source. A promoted candidate remains
+    on the trainable source + adapter and the state names that serving model
+    explicitly.
+    """
+    with _STATE_LOCK:
+        state = _read_state()
+        if state.get("status") not in {"benchmark-queued", "candidate-ready"}:
+            return
+        if not _autonomous_candidate_benchmark_allowed(state):
+            if state.get("status") == "benchmark-queued":
+                state["status"] = "candidate-ready"
+                _write_state(state)
+            return
+        candidate = _candidate_artifact_path(candidate_path)
+        if candidate is None:
+            state["status"] = "error"
+            state["lastError"] = "The completed self-QLoRA adapter disappeared before benchmarking."
+            _write_state(state)
+            return
+        state["status"] = "benchmark-loading-base"
+        state["lastError"] = None
+        _write_state(state)
+
+    backend = None
+    loaded_for_benchmark = False
+    try:
+        backend, loaded_for_benchmark = await _ensure_trainable_base_for_benchmark(subject)
+        result = await benchmark_self_training_candidate(
+            SelfTrainingBenchmarkRequest(candidateAdapterPath=candidate),
+            current_subject=subject,
+        )
+        evaluation = result.get("lastEvaluation") if isinstance(result, dict) else None
+        promoted = bool(isinstance(evaluation, dict) and evaluation.get("promoted"))
+        with _STATE_LOCK:
+            state = _read_state()
+            state["candidateQualifiedOnly"] = False
+            if promoted:
+                state["activeServingModelId"] = str(state.get("baseModelId") or "") or None
+            else:
+                state["activeServingModelId"] = None
+            _write_state(state)
+        if not promoted and loaded_for_benchmark and backend is not None:
+            base_model = str(result.get("baseModelId") or "") if isinstance(result, dict) else ""
+            if not base_model:
+                with _STATE_LOCK:
+                    base_model = str(_read_state().get("baseModelId") or "")
+            if base_model:
+                await asyncio.to_thread(backend.unload_model, base_model)
+    except Exception as error:  # noqa: BLE001 -- autonomous learning must fail closed, chat fail open
+        if loaded_for_benchmark and backend is not None:
+            try:
+                with _STATE_LOCK:
+                    base_model = str(_read_state().get("baseModelId") or "")
+                if base_model:
+                    await asyncio.to_thread(backend.unload_model, base_model)
+            except Exception:
+                pass
+        with _STATE_LOCK:
+            state = _read_state()
+            state["status"] = "error"
+            state["lastError"] = f"Automatic candidate benchmark failed: {error}"[:2_000]
+            state["activeServingModelId"] = None
+            state["candidateQualifiedOnly"] = False
+            _write_state(state)
+
+
+async def _watch_self_training_job(subject: str, job_id: str, qualified_only: bool) -> None:
+    """Follow one accepted self-QLoRA job through artifact and optional benchmark."""
+    empty_terminal_polls = 0
+    while True:
+        await asyncio.sleep(1.0)
+        terminal = await asyncio.to_thread(_training_terminal_snapshot, job_id)
+        if terminal is None:
+            empty_terminal_polls += 1
+            if empty_terminal_polls < 30:
+                continue
+            with _STATE_LOCK:
+                state = _read_state()
+                if state.get("lastJobId") == job_id and state.get("status") == "training":
+                    state["status"] = "error"
+                    state["lastError"] = "The self-QLoRA worker state became unavailable before a terminal receipt."
+                    state["trainingQualifiedOnly"] = False
+                    _write_state(state)
+            return
+        empty_terminal_polls = 0
+        if terminal.get("active") is True:
+            continue
+        if terminal.get("completed") is True:
+            candidate_to_benchmark = None
+            with _STATE_LOCK:
+                state = _read_state()
+                if state.get("lastJobId") != job_id:
+                    return
+                _record_completed_candidate(
+                    state,
+                    job_id=job_id,
+                    output_dir=str(terminal.get("output_dir") or ""),
+                    qualified_only=qualified_only,
+                )
+                candidate_to_benchmark = _queue_candidate_benchmark_if_allowed(state)
+                _write_state(state)
+            if candidate_to_benchmark:
+                await _benchmark_completed_candidate(subject, candidate_to_benchmark)
+            return
+        error = str(terminal.get("error") or "").strip()
+        if error:
+            with _STATE_LOCK:
+                state = _read_state()
+                if state.get("lastJobId") == job_id:
+                    state["status"] = "error"
+                    state["lastError"] = error[:2_000]
+                    state["trainingQualifiedOnly"] = False
+                    state["candidateQualifiedOnly"] = False
+                    _write_state(state)
+            return
+
+
 async def _start_training_for_state(subject: str) -> None:
     """Start one bounded LoRA/QLoRA run after the HTTP response has returned."""
     with _STATE_LOCK:
@@ -578,17 +993,20 @@ async def _start_training_for_state(subject: str) -> None:
         job_id = getattr(result, "job_id", None) or (
             result.get("job_id") if isinstance(result, dict) else None
         )
+        start_failed = getattr(result, "status", None) == "error" or (
+            isinstance(result, dict) and result.get("status") == "error"
+        )
         with _STATE_LOCK:
             state = _read_state()
             state["lastJobId"] = job_id
-            if getattr(result, "status", None) == "error" or (
-                isinstance(result, dict) and result.get("status") == "error"
-            ):
+            if start_failed:
                 state["status"] = "error"
                 state["lastError"] = getattr(result, "message", None) or (
                     result.get("message") if isinstance(result, dict) else "Self-QLoRA could not start."
                 )
             _write_state(state)
+        if not start_failed and job_id:
+            await _watch_self_training_job(subject, str(job_id), qualified_only)
     except Exception as error:  # noqa: BLE001
         with _STATE_LOCK:
             state = _read_state()
@@ -637,14 +1055,20 @@ def get_self_training(
     current_subject: str = Depends(get_current_subject),
 ):
     reschedule = False
+    candidate_to_benchmark = None
     with _STATE_LOCK:
         state = _read_state()
         changed, reschedule = _reconcile_persisted_training_state(state)
-        if changed:
+        candidate_to_benchmark = _queue_candidate_benchmark_if_allowed(state)
+        if changed or candidate_to_benchmark:
             _write_state(state)
         result = _public_state(state)
     if reschedule:
         background_tasks.add_task(_start_training_for_state, current_subject)
+    if candidate_to_benchmark:
+        background_tasks.add_task(
+            _benchmark_completed_candidate, current_subject, candidate_to_benchmark
+        )
     return result
 
 
@@ -705,7 +1129,6 @@ async def set_self_training_recommendation(
         background_tasks.add_task(_start_training_for_state, current_subject)
     if schedule_runtime_fix:
         background_tasks.add_task(_apply_runtime_fix_for_state)
-    background_tasks.add_task(_record_mem0_experience, current_subject, payload)
     return result
 
 
@@ -716,11 +1139,24 @@ def set_self_training_baseline(
 ):
     with _STATE_LOCK:
         state = _read_state()
-        state["baseModelId"] = payload.modelId.strip()
-        state["baseSnapshotPath"] = payload.snapshotPath.strip() if payload.snapshotPath else None
+        requested = payload.modelId.strip()
+        baseline = _trainable_baseline_for_serving_model(requested)
+        state["baseModelId"] = baseline
+        state["baseServingModelId"] = requested if requested != baseline else None
+        requested_snapshot = payload.snapshotPath.strip() if payload.snapshotPath else None
+        if requested != baseline:
+            state["baseSnapshotPath"] = None
+            state["baseServingSnapshotPath"] = requested_snapshot
+        else:
+            state["baseSnapshotPath"] = requested_snapshot
+            state["baseServingSnapshotPath"] = None
         state["baseContextLength"] = payload.contextLength
-        # A new baseline must never reuse examples from a different model.
-        state["examples"] = [item for item in state.get("examples", []) if item.get("modelId") == state["baseModelId"]]
+        # A new baseline may intentionally be the trainable source of a GGUF-serving
+        # checkpoint. Keep only examples that map to that same source model.
+        state["examples"] = [
+            item for item in state.get("examples", [])
+            if _example_matches_baseline(item, baseline)
+        ]
         _write_dataset(state)
         _write_state(state)
         return _public_state(state)
@@ -745,15 +1181,21 @@ def record_hermes_qualified_candidate(
         if not state.get("enabled", True):
             return False
         baseline = str(state.get("baseModelId") or "").strip()
-        if baseline and baseline != model_id.strip():
+        serving_model = model_id.strip()
+        if baseline and not _serving_model_matches_baseline(state, serving_model):
             return False
         if not baseline:
-            state["baseModelId"] = model_id.strip()
+            baseline = _trainable_baseline_for_serving_model(serving_model)
+            state["baseModelId"] = baseline
+            state["baseServingModelId"] = serving_model if serving_model != baseline else None
+        elif serving_model != baseline and not state.get("baseServingModelId"):
+            state["baseServingModelId"] = serving_model
         if any(item.get("sourceTrajectoryId") == source_trajectory_id for item in state.get("examples", [])):
             return False
         example = {
             "id": uuid.uuid4().hex,
-            "modelId": model_id.strip(),
+            "modelId": serving_model,
+            "trainableBaseModelId": baseline,
             "prompt": prompt.strip()[:20_000],
             "completion": completion.strip()[:24_000],
             "sourceThreadId": source_thread_id,
@@ -782,13 +1224,19 @@ async def record_self_training_example(
         if not state.get("enabled", True):
             return {"recorded": False, "reason": "disabled", **_public_state(state)}
         baseline = str(state.get("baseModelId") or "").strip()
-        if baseline and baseline != payload.modelId.strip():
+        serving_model = payload.modelId.strip()
+        if baseline and not _serving_model_matches_baseline(state, serving_model):
             return {"recorded": False, "reason": "model differs from baseline", **_public_state(state)}
         if not baseline:
-            state["baseModelId"] = payload.modelId.strip()
+            baseline = _trainable_baseline_for_serving_model(serving_model)
+            state["baseModelId"] = baseline
+            state["baseServingModelId"] = serving_model if serving_model != baseline else None
+        elif serving_model != baseline and not state.get("baseServingModelId"):
+            state["baseServingModelId"] = serving_model
         example = {
             "id": uuid.uuid4().hex,
-            "modelId": payload.modelId.strip(),
+            "modelId": serving_model,
+            "trainableBaseModelId": baseline,
             "prompt": payload.prompt.strip(),
             "completion": payload.completion.strip(),
             "sourceThreadId": payload.sourceThreadId,

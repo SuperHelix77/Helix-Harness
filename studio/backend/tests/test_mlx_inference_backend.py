@@ -5913,3 +5913,67 @@ def _mlx_reads_video_probe(monkeypatch):
         lambda _t, _m, **_k: "<video> marked",
     )
     return _mlx_reads_video(SimpleNamespace(video_processor = object(), tokenizer = SimpleNamespace()))
+
+
+def test_mlx_live_adapter_hotswap_and_revert_keep_resident_base(tmp_path, monkeypatch):
+    from contextlib import nullcontext
+    from core.inference import mlx_inference
+    from core.inference.mlx_inference import MLXInferenceBackend
+
+    _install_fake_mlx(monkeypatch)
+    base = object()
+    model = _AdapterTree({"model.layers.0.proj": base})
+    wrapper = SimpleNamespace(lora_a=object(), lora_b=object(), linear=base)
+    adapter_dir = tmp_path / "adapter"
+    adapter_dir.mkdir()
+    (adapter_dir / "adapter_config.json").write_text(
+        '{"fine_tune_type":"lora","num_layers":1,"lora_parameters":{"rank":4}}',
+        encoding="utf-8",
+    )
+    (adapter_dir / "adapters.safetensors").write_bytes(b"fixture")
+
+    import mlx_lm.tuner.utils as tuner_utils
+
+    def _load_adapters(live_model, path):
+        assert live_model is model
+        assert path == str(adapter_dir)
+        live_model.update_modules({"model.layers.0.proj": wrapper})
+        return live_model
+
+    monkeypatch.setattr(tuner_utils, "load_adapters", _load_adapters)
+    monkeypatch.setattr(mlx_inference, "_mlx_fused_moe_gate_up", lambda current: nullcontext(current))
+
+    backend = MLXInferenceBackend()
+    backend.active_model_name = "base/model"
+    backend._model = model
+    backend._is_vlm = False
+    backend.models = {
+        "base/model": {
+            "model": model,
+            "is_lora": False,
+            "active_adapter": None,
+        }
+    }
+    monkeypatch.setattr(backend, "_clear_prompt_cache", lambda: None)
+
+    assert backend.load_adapter("base/model", str(adapter_dir), "candidate") is True
+    assert model.modules["model.layers.0.proj"] is wrapper
+    assert backend.set_active_adapter("base/model", "candidate") is True
+    assert backend.models["base/model"]["active_adapter"] == "candidate"
+    assert backend.models["base/model"]["is_lora"] is True
+
+    selected = {}
+    def _generate_chat_response(**kwargs):
+        selected["adapter"] = kwargs.get("_adapter_state")
+        yield "adapted"
+    monkeypatch.setattr(backend, "generate_chat_response", _generate_chat_response)
+    assert list(backend.generate_with_adapter_control(use_adapter="candidate")) == ["adapted"]
+    assert selected["adapter"] is True
+    with pytest.raises(NotImplementedError, match="currently hot-swapped adapter"):
+        list(backend.generate_with_adapter_control(use_adapter="other"))
+
+    assert backend.revert_to_base_model("base/model") is True
+    assert model.modules["model.layers.0.proj"] is base
+    assert backend.models["base/model"]["active_adapter"] is None
+    assert backend.models["base/model"]["is_lora"] is False
+    assert backend._model is model
