@@ -597,6 +597,7 @@ def run_safetensors_tool_loop(
     context_length: Optional[int] = None,
     max_tokens: Optional[int] = None,
     generation_stats_holder: Optional[dict] = None,
+    helix_turn_id: Optional[str] = None,
 ) -> Generator[dict, None, None]:
     """Drive an agentic tool loop on top of a cumulative-text generator.
 
@@ -1478,6 +1479,7 @@ def run_safetensors_tool_loop(
                         thread_id = thread_id,
                         rag_scope = rag_scope,
                         disable_sandbox = bypass_permissions,
+                        helix_turn_id = helix_turn_id,
                     )
                     if _accepts_kwarg(execute_tool, "conversation_branch"):
                         kwargs["conversation_branch"] = request_branch

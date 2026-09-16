@@ -2,7 +2,34 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Optional
+
+
+class VerificationKind(str, Enum):
+    TEST = "test"
+    BENCHMARK = "benchmark"
+    VERIFIER = "verifier"
+
+
+class VerificationStatus(str, Enum):
+    PASSED = "passed"
+    FAILED = "failed"
+
+
+@dataclass(frozen=True)
+class ToolVerificationReceipt:
+    kind: VerificationKind
+    status: VerificationStatus
+    provenance: str = "backend_tool_capture"
+    detail: str = ""
+    # Backend-owned semantic binding. A passed verifier is not evidence for an
+    # arbitrary model-authored claim merely because the model cites its tool id.
+    # ``claim`` names the exact assertion the verifier established; ``subject``
+    # binds the run to the artifact/object it verified (for example a corrected
+    # training target digest). Model tool arguments never populate either field.
+    claim: str = ""
+    subject: str = ""
 
 
 @dataclass
@@ -13,6 +40,7 @@ class ToolStep:
     useful_hint: str = ""
     error: Optional[str] = None
     retry: int = 0
+    verification: Optional[ToolVerificationReceipt] = None
 
 
 @dataclass

@@ -10,8 +10,10 @@ use std::process::Stdio;
 use std::time::{Duration, Instant, UNIX_EPOCH};
 use tokio::io::AsyncReadExt;
 
-// 3: the cached capability gained studio_install_ok / studio_install_reason.
-const MANAGED_CAPABILITY_CACHE_SCHEMA: u16 = 3;
+// 4: the fingerprint now includes the Helix backend contract surfaces and cached Ready
+// answers are written only after the managed runtime passes that contract probe.
+const MANAGED_CAPABILITY_CACHE_SCHEMA: u16 = 4;
+const HELIX_HARNESS_BACKEND_CONTRACT: &str = "helix.adaptive.backend.v1";
 
 /// The install is fine; the directory its children must run from is not reachable.
 pub(super) const WORKING_DIRECTORY_UNAVAILABLE: &str = "working_directory_unavailable";
@@ -193,6 +195,24 @@ fn marker_candidates_for_bin(bin: &Path) -> Vec<PathBuf> {
                 .join("commands")
                 .join("studio.py"),
         );
+        // These files are the release/runtime contract unique to Helix Harness.
+        // Including them in the capability fingerprint means a same-version pip
+        // repair that overwrites the overlay invalidates the cached Ready verdict.
+        for relative in [
+            ["studio", "backend", "state", "tool_policy.py"].as_slice(),
+            ["studio", "backend", "core", "helix_engine", "controller.py"].as_slice(),
+            ["studio", "backend", "core", "helix_engine", "hermes.py"].as_slice(),
+            ["studio", "backend", "core", "helix_engine", "training_targets.py"].as_slice(),
+            ["studio", "backend", "core", "inference", "tools.py"].as_slice(),
+            ["studio", "backend", "routes", "helix_engine.py"].as_slice(),
+            ["studio", "backend", "routes", "self_training.py"].as_slice(),
+        ] {
+            let mut path = site_packages.clone();
+            for component in relative {
+                path.push(component);
+            }
+            out.push(path);
+        }
     }
     for marker_name in FALLBACK_MARKER_NAMES {
         out.push(venv_dir.join(marker_name));
@@ -435,6 +455,56 @@ async fn run_cli_probe(bin: &Path, args: &[&str]) -> Result<bool, String> {
     Ok(ok)
 }
 
+async fn probe_helix_backend_contract(bin: &Path) -> Result<bool, String> {
+    let Some(scripts_dir) = bin.parent() else {
+        return Ok(false);
+    };
+    #[cfg(windows)]
+    let python = scripts_dir.join("python.exe");
+    #[cfg(not(windows))]
+    let python = scripts_dir.join("python");
+    if !python.is_file() {
+        return Ok(false);
+    }
+
+    let probe = format!(
+        r#"import pathlib, studio, sys
+root = pathlib.Path(studio.__file__).resolve().parent / 'backend'
+sys.path.insert(0, str(root))
+from state.tool_policy import HELIX_HARNESS_BACKEND_CONTRACT, require_tool_access
+from core.helix_engine.controller import run_closed_loop
+assert HELIX_HARNESS_BACKEND_CONTRACT == {contract:?}
+assert callable(require_tool_access)
+assert callable(run_closed_loop)
+"#,
+        contract = HELIX_HARNESS_BACKEND_CONTRACT,
+    );
+    let mut cmd = tokio::process::Command::new(python);
+    cmd.arg("-c").arg(probe).stdout(Stdio::null()).stderr(Stdio::null());
+    if let Err(error) = crate::process::apply_managed_cli_context_tokio(&mut cmd) {
+        return Err(error.to_string());
+    }
+    #[cfg(target_os = "linux")]
+    crate::process::scrub_appimage_python_env_tokio(&mut cmd);
+    cmd.env_remove("UNSLOTH_STUDIO_HOME");
+    cmd.env_remove("STUDIO_HOME");
+
+    let Ok(mut child) = crate::process::with_studio_runtime_launch_guard(|| {
+        cmd.spawn().map_err(|error| error.to_string())
+    }) else {
+        return Ok(false);
+    };
+    let ok = match tokio::time::timeout(Duration::from_secs(10), child.wait()).await {
+        Ok(Ok(status)) => status.success(),
+        _ => {
+            let _ = child.kill().await;
+            let _ = child.wait().await;
+            false
+        }
+    };
+    Ok(ok)
+}
+
 async fn probe_cli_capability(bin: &Path) -> Result<Option<DesktopCapability>, String> {
     let started = Instant::now();
     let Ok(mut cmd) = crate::process::build_managed_cli_command_tokio(
@@ -625,6 +695,28 @@ pub(super) async fn probe_managed_bin(bin: PathBuf) -> ManagedProbe {
         }
     }
 
+    match probe_helix_backend_contract(&bin).await {
+        Ok(true) => {}
+        Ok(false) => {
+            info!(
+                "Managed preflight: Helix backend contract mismatch for {:?} in {}ms",
+                bin,
+                started.elapsed().as_millis()
+            );
+            return ManagedProbe::Stale {
+                bin,
+                reason: "helix_backend_contract_mismatch".to_string(),
+            };
+        }
+        Err(_) => {
+            return ManagedProbe::Stale {
+                bin,
+                reason: working_directory_reason()
+                    .unwrap_or_else(|| WORKING_DIRECTORY_UNAVAILABLE.to_string()),
+            };
+        }
+    }
+
     let capability = match probe_cli_capability(&bin).await {
         Ok(capability) => capability,
         Err(_) => {
@@ -789,6 +881,34 @@ mod tests {
             desktop_capability_stale_reason(&capability).as_deref(),
             Some("desktop_manageability_unsupported")
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn helix_contract_files_participate_in_the_managed_fingerprint() {
+        let venv = std::env::temp_dir().join(format!(
+            "helix-contract-markers-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let bin_dir = venv.join("bin");
+        let site_packages = venv.join("lib").join("python3.13").join("site-packages");
+        fs::create_dir_all(&bin_dir).unwrap();
+        fs::create_dir_all(&site_packages).unwrap();
+        let bin = bin_dir.join("unsloth");
+
+        let candidates = marker_candidates_for_bin(&bin);
+        let expected = [
+            site_packages.join("studio/backend/state/tool_policy.py"),
+            site_packages.join("studio/backend/core/helix_engine/controller.py"),
+            site_packages.join("studio/backend/core/helix_engine/training_targets.py"),
+            site_packages.join("studio/backend/core/inference/tools.py"),
+            site_packages.join("studio/backend/routes/self_training.py"),
+        ];
+        for path in expected {
+            assert!(candidates.contains(&path), "missing Helix contract marker: {}", path.display());
+        }
+        let _ = fs::remove_dir_all(venv);
     }
 
     #[test]

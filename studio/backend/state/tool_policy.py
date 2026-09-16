@@ -31,6 +31,9 @@ from contextlib import contextmanager
 from functools import partial, wraps
 from typing import Iterator, Optional
 
+# Contract checked by the native Helix Harness preflight. Bump only when a packaged desktop backend must be overlaid as one coherent source revision.
+HELIX_HARNESS_BACKEND_CONTRACT = "helix.adaptive.backend.v1"
+
 _tool_policy: Optional[bool] = None
 _tool_policy_default: Optional[bool] = None
 

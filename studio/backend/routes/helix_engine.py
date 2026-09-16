@@ -3,9 +3,9 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from pydantic import BaseModel, Field
 
 from auth.authentication import get_current_subject
@@ -42,6 +42,7 @@ class CorrectionIn(BaseModel):
 
 
 class TrajectoryIn(BaseModel):
+    analysis_id: str | None = None
     prompt_state: str
     retrieved_context: str = ""
     reasoning: str = ""
@@ -59,6 +60,11 @@ class TrajectoryIn(BaseModel):
     one_off_fact: bool = False
     regression_passed: bool = False
     dataset_hash: str = ""
+    telemetry: dict[str, Any] = Field(default_factory=dict)
+    self_audit: dict[str, Any] | None = None
+    claims: list[dict[str, Any]] = Field(default_factory=list)
+    acceptance_criteria: list[str] = Field(default_factory=list)
+    model_id: str = ""
 
 
 def _traj(payload: TrajectoryIn) -> Trajectory:
@@ -80,36 +86,172 @@ def _traj(payload: TrajectoryIn) -> Trajectory:
         one_off_fact=payload.one_off_fact,
         regression_passed=payload.regression_passed,
         dataset_hash=payload.dataset_hash,
+        extras={
+            "telemetry": payload.telemetry,
+            "acceptance_criteria": payload.acceptance_criteria,
+            "model_id": payload.model_id,
+            # /analyze is an exploratory/manual control-plane surface. A client
+            # checkbox or UI default is not an objective verifier receipt.
+            "objective_verified": False,
+            "trajectory_id": payload.analysis_id or "",
+            "manual_analysis": True,
+        },
     )
+
+
+class VerifiedTrainingTargetIn(BaseModel):
+    target: str = Field(min_length=1, max_length=24_000)
+    source: Literal["human_correction", "objective_correction"]
+    source_ref: str = Field(default="", max_length=500)
+    evidence_refs: list[str] = Field(default_factory=list, max_length=64)
 
 
 class IngestTurnIn(BaseModel):
     session_id: str = ""
     thread_id: str | None = None
+    turn_id: str | None = None
     prompt: str = ""
     final_result: str = ""
     critic: dict[str, Any] | None = None
+    self_audit: dict[str, Any] | None = None
+    claims: list[dict[str, Any]] = Field(default_factory=list)
+    telemetry: dict[str, Any] = Field(default_factory=dict)
+    acceptance_criteria: list[str] = Field(default_factory=list)
+    # `model_id` remains the loadable/base checkpoint used by training.  The
+    # effective identity differentiates base and adapter behavior for recurrence
+    # and self-audit provenance without inventing an unloadable training model id.
+    model_id: str = ""
+    effective_model_id: str = ""
+    adapter_state: bool | None = None
+    verified_training_target: VerifiedTrainingTargetIn | None = None
+
+
+class DecisionIn(BaseModel):
+    decision: str
+    features: dict[str, Any] = Field(default_factory=dict)
+
+
+class DecisionOutcomeIn(BaseModel):
+    decision_id: str
+    eventual_outcome: bool
+    retrospective_usefulness: bool | None = None
 
 
 @router.post("/analyze")
 def analyze_trajectory(payload: TrajectoryIn) -> dict[str, Any]:
-    return run_adaptation_pipeline(_traj(payload))
+    from uuid import uuid4
+
+    if not payload.analysis_id:
+        payload = payload.model_copy(update={"analysis_id": f"manual:{uuid4().hex}"})
+    return run_adaptation_pipeline(
+        _traj(payload), self_audit=payload.self_audit, claims=payload.claims
+    )
+
+
+@router.post("/decision")
+def advisory_decision(payload: DecisionIn) -> dict[str, Any]:
+    from uuid import uuid4
+    from core.helix_engine.decision_controller import shadow_decision
+    from core.helix_engine.ledger import append_record
+
+    decision = shadow_decision(
+        payload.decision,
+        payload.features,
+        decision_id=f"manual:{uuid4().hex}",
+    )
+    append_record("decisions", decision.to_dict())
+    return decision.to_dict()
+
+
+@router.post("/decision-outcome")
+def decision_outcome(payload: DecisionOutcomeIn) -> dict[str, Any]:
+    from core.helix_engine.decision_controller import record_decision_outcome
+
+    recorded = record_decision_outcome(
+        payload.decision_id,
+        eventual_outcome=payload.eventual_outcome,
+        retrospective_usefulness=payload.retrospective_usefulness,
+    )
+    return {"recorded": recorded}
+
+
+@router.get("/decision-calibration")
+def decision_calibration() -> dict[str, Any]:
+    from core.helix_engine.decision_controller import calibration_summary
+
+    return calibration_summary()
 
 
 @router.post("/ingest-turn")
 def ingest_completed_turn(
     payload: IngestTurnIn,
+    background_tasks: BackgroundTasks,
     current_subject: str = Depends(get_current_subject),
 ) -> dict[str, Any]:
-    key = feed_session_id(payload.session_id, payload.thread_id)
-    return ingest_turn(
+    from core.helix_engine.capture import capture_session_key, session_steps
+    from core.helix_engine.training_targets import issue_verified_training_target_receipt
+
+    key = capture_session_key(payload.session_id, payload.thread_id, payload.turn_id)
+    target_receipt = None
+    target_receipt_error = ""
+    if payload.verified_training_target is not None:
+        if not payload.turn_id:
+            target_receipt_error = "turn_id is required for a verified training target"
+        else:
+            correction = payload.verified_training_target
+            try:
+                target_receipt = issue_verified_training_target_receipt(
+                    trajectory_id=payload.turn_id,
+                    target=correction.target,
+                    source=correction.source,
+                    verifier_subject=current_subject,
+                    source_ref=correction.source_ref,
+                    evidence_refs=correction.evidence_refs,
+                    steps=session_steps(key),
+                    source_thread_id=payload.thread_id,
+                )
+                if target_receipt is None:
+                    target_receipt_error = "verified training target provenance could not be persisted"
+            except ValueError as exc:
+                target_receipt_error = str(exc)[:500]
+
+    result = ingest_turn(
         session_id=key,
         prompt=payload.prompt,
         final_result=payload.final_result,
         critic=payload.critic,
+        self_audit=payload.self_audit,
+        claims=payload.claims,
+        telemetry=payload.telemetry,
+        acceptance_criteria=payload.acceptance_criteria,
+        model_id=payload.model_id,
+        effective_model_id=payload.effective_model_id,
+        adapter_state=payload.adapter_state,
+        training_target_receipt=target_receipt,
         thread_id=payload.thread_id,
+        turn_id=payload.turn_id,
         subject=current_subject,
     )
+    if "stage_qlora_candidate" in result.get("actions", []):
+        try:
+            from routes.self_training import (
+                _start_training_for_state,
+                queue_hermes_training_if_allowed,
+            )
+
+            if queue_hermes_training_if_allowed():
+                result["actions"].append("queue_qlora_training")
+                background_tasks.add_task(_start_training_for_state, current_subject)
+        except Exception:
+            pass
+    result["actions"] = list(dict.fromkeys(result.get("actions", [])))
+    if payload.verified_training_target is not None:
+        result["training_target_receipt"] = (
+            {"accepted": True, **target_receipt.metadata()}
+            if target_receipt is not None
+            else {"accepted": False, "reason": target_receipt_error or "verified training target rejected"}
+        )
+    return result
 
 
 @router.post("/semantic-turns")
@@ -124,21 +266,37 @@ def live_feed(session_id: str | None = None, thread_id: str | None = None) -> di
 
 
 @router.get("/session/{session_id}")
-def session_trace(session_id: str) -> dict[str, Any]:
-    from core.helix_engine.capture import session_steps
+def session_trace(
+    session_id: str, thread_id: str | None = None, turn_id: str | None = None
+) -> dict[str, Any]:
+    from core.helix_engine.capture import (
+        capture_session_key,
+        latest_session_steps,
+        session_steps,
+    )
 
-    return {
-        "session_id": session_id,
-        "steps": [
+    key = capture_session_key(session_id, thread_id, turn_id)
+    from core.helix_engine.evidence import tool_verification_receipt
+
+    steps = session_steps(key) if turn_id else latest_session_steps(session_id, thread_id)
+    payload_steps = []
+    for index, step in enumerate(steps):
+        evidence_ids = [f"tool:{index}:error" if step.error else f"tool:{index}:result"]
+        if tool_verification_receipt(step):
+            evidence_ids.append(f"tool:{index}:verification")
+        payload_steps.append(
             {
+                "index": index,
+                "evidence_ids": evidence_ids,
                 "name": step.name,
-                "arguments": step.arguments,
-                "result": step.result[:500],
+                "arguments": step.arguments[:2_000],
+                "result": step.result[:1_200],
                 "useful_hint": step.useful_hint,
+                "error": step.error,
+                "retry": step.retry,
             }
-            for step in session_steps(session_id)
-        ],
-    }
+        )
+    return {"session_id": key, "steps": payload_steps}
 
 
 @router.get("/hub/local")

@@ -5626,6 +5626,30 @@ else
     bash "$SETUP_SH" </dev/null || _SETUP_EXIT=$?
 fi
 
+_apply_helix_backend_overlay() {
+    _helix_overlay="${HELIX_HARNESS_BACKEND_OVERLAY:-}"
+    [ -n "$_helix_overlay" ] || return 0
+    if [ ! -d "$_helix_overlay" ]; then
+        echo "[ERROR] Helix Harness backend overlay is missing: $_helix_overlay" >&2
+        return 1
+    fi
+    _helix_applier="${HELIX_HARNESS_BACKEND_APPLIER:-$(dirname "$_helix_overlay")/apply_helix_backend_overlay.py}"
+    if [ ! -f "$_helix_applier" ]; then
+        echo "[ERROR] Helix Harness backend applier is missing: $_helix_applier" >&2
+        return 1
+    fi
+    substep "applying the bundled Helix Harness backend revision..."
+    "$VENV_DIR/bin/python" "$_helix_applier" "$_helix_overlay"
+}
+
+
+if [ "$_SETUP_EXIT" -eq 0 ]; then
+    _apply_helix_backend_overlay || _SETUP_EXIT=$?
+    if [ "$_SETUP_EXIT" -ne 0 ]; then
+        tauri_log "ERROR" "Helix Harness backend overlay failed"
+    fi
+fi
+
 if [ "$_SETUP_EXIT" -eq 0 ]; then
     # First: until this runs, anything that fails below reaches the exit trap, which would restore the previous environment over the one just installed.
     _commit_studio_venv_replacement

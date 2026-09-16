@@ -189,10 +189,11 @@ import { selectCodeToolNames } from "./code-tool-placement";
 import { chatModeInstruction } from "../lib/chat-mode";
 import {
   HERMES_LEARNING_CHANGED_EVENT,
-  helixSelfCriticPrompt,
+  helixSelfAuditPrompt,
+  isHelixSelfAuditRequest,
   isHelixSelfCriticRequest,
   isHermesLearningReviewRequest,
-  parseHelixSelfCritic,
+  parseHelixSelfAudit,
   parseOnTheFlySkillDraft,
   parseHermesLearningProposal,
   stripOnTheFlySkillDraft,
@@ -255,16 +256,44 @@ if (typeof window !== "undefined") {
   });
 }
 
+type SelfReflectInput = {
+  threadId?: string;
+  sessionId?: string;
+  turnId?: string;
+  userText: string;
+  assistantText: string;
+  checkpoint: string;
+  /** Exact adapter/base state used for the foreground turn. The post-task audit
+   *  must pin the same state because an omitted use_adapter means “leave the
+   *  shared model as-is”, which another request may change before audit time. */
+  useAdapter?: boolean;
+  telemetry?: Record<string, unknown>;
+  force?: boolean;
+};
+
 const criticInFlight = new Set<string>();
-const criticQueued = new Map<
-  string,
-  {
-    threadId?: string;
-    userText: string;
-    assistantText: string;
-    checkpoint: string;
+const criticQueued = new Map<string, SelfReflectInput>();
+
+async function waitForSelfAuditIdle(maxWaitMs: number): Promise<boolean> {
+  const started = Date.now();
+  // Let the just-completed foreground run clear its ownership first.
+  await new Promise<void>((resolve) => window.setTimeout(resolve, 500));
+  while (Date.now() - started < maxWaitMs) {
+    const busy = Object.values(
+      useChatRuntimeStore.getState().localRunByThreadId,
+    ).some(Boolean);
+    if (!busy) {
+      // Close the send-vs-audit race: require one short stable-idle interval.
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 150));
+      const stillBusy = Object.values(
+        useChatRuntimeStore.getState().localRunByThreadId,
+      ).some(Boolean);
+      if (!stillBusy) return true;
+    }
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 400));
   }
->();
+  return false;
+}
 
 async function skillPreflightBlock(userText: string): Promise<string> {
   try {
@@ -298,17 +327,12 @@ async function skillPreflightBlock(userText: string): Promise<string> {
   }
 }
 
-function scheduleSelfReflect(input: {
-  threadId?: string;
-  userText: string;
-  assistantText: string;
-  checkpoint: string;
-  force?: boolean;
-}): void {
+function scheduleSelfReflect(input: SelfReflectInput): void {
   const key = input.threadId || "none";
   if (
     isHermesLearningReviewRequest(input.userText) ||
-    isHelixSelfCriticRequest(input.userText)
+    isHelixSelfCriticRequest(input.userText) ||
+    isHelixSelfAuditRequest(input.userText)
   ) {
     return;
   }
@@ -326,33 +350,71 @@ function scheduleSelfReflect(input: {
   }).catch(() => undefined);
   void (async () => {
     try {
-      const response = await authFetch("/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: input.checkpoint,
-          messages: [{ role: "user", content: helixSelfCriticPrompt(excerpt) }],
-          max_tokens: 256,
-          stream: false,
-          enable_tools: false,
-        }),
-      });
-      const payload = response.ok
-        ? ((await response.json()) as {
-            choices?: Array<{ message?: { content?: string } }>;
-          })
-        : null;
-      const text = payload?.choices?.[0]?.message?.content ?? "";
-      const critic = parseHelixSelfCritic(text);
+      const captureSessionId = input.sessionId || input.threadId || "default";
+      let trace: { steps?: unknown[] } = {};
+      try {
+        const traceParams = new URLSearchParams();
+        if (input.threadId) traceParams.set("thread_id", input.threadId);
+        if (input.turnId) traceParams.set("turn_id", input.turnId);
+        const traceQuery = traceParams.toString();
+        const traceResponse = await authFetch(
+          `/api/helix-engine/session/${encodeURIComponent(captureSessionId)}${traceQuery ? `?${traceQuery}` : ""}`,
+        );
+        if (traceResponse.ok) trace = (await traceResponse.json()) as { steps?: unknown[] };
+      } catch {
+        // Tool trace is useful evidence, never a prerequisite for the audit.
+      }
+      const observableArtifacts = {
+        objective: input.userText.slice(0, 4_000),
+        final_result: input.assistantText.slice(0, 4_000),
+        // Keep cheap objective telemetry ahead of potentially large tool receipts.
+        telemetry: input.telemetry ?? {},
+        tool_steps: Array.isArray(trace.steps) ? trace.steps.slice(-16) : [],
+      };
+      const idleForAudit = await waitForSelfAuditIdle(input.force ? 20_000 : 8_000);
+      let audit: ReturnType<typeof parseHelixSelfAudit> = null;
+      if (idleForAudit) {
+        const response = await authFetch("/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Helix-Background-Audit": "1",
+          },
+          body: JSON.stringify({
+            model: input.checkpoint,
+            messages: [{ role: "user", content: helixSelfAuditPrompt(excerpt, observableArtifacts) }],
+            max_tokens: 900,
+            stream: false,
+            enable_tools: false,
+            ...(input.useAdapter === undefined ? {} : { use_adapter: input.useAdapter }),
+          }),
+        });
+        const payload = response.ok
+          ? ((await response.json()) as {
+              choices?: Array<{ message?: { content?: string } }>;
+            })
+          : null;
+        const text = payload?.choices?.[0]?.message?.content ?? "";
+        audit = parseHelixSelfAudit(text);
+      }
       await authFetch("/api/helix-engine/ingest-turn", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          session_id: input.threadId || "default",
+          session_id: captureSessionId,
           thread_id: input.threadId,
+          turn_id: input.turnId,
           prompt: input.userText.slice(0, 4_000),
           final_result: input.assistantText.slice(0, 4_000),
-          ...(critic ? { critic } : {}),
+          // Keep the loadable checkpoint separate from the behavioral identity.
+          // Recurrence/provenance must not merge base and adapter trajectories.
+          model_id: input.checkpoint,
+          effective_model_id: `${input.checkpoint}::adapter=${
+            input.useAdapter === true ? "enabled" : input.useAdapter === false ? "disabled" : "unspecified"
+          }`,
+          adapter_state: input.useAdapter,
+          telemetry: input.telemetry ?? {},
+          ...(audit ? { self_audit: audit, claims: audit.claims } : {}),
         }),
       }).catch(() => undefined);
       if (typeof window !== "undefined") {
@@ -589,6 +651,22 @@ interface ServerUsage {
   };
   cache_creation_input_tokens?: number;
   cache_read_input_tokens?: number;
+}
+
+interface ServerSpeculative {
+  mode?: string;
+  requested?: string;
+  engaged?: string;
+  draft_model?: string | null;
+  draft_tokens?: number;
+  accepted_tokens?: number;
+  steps?: number;
+  used?: boolean;
+  /** Request-local counters are admissible trajectory evidence; GGUF currently
+   *  reports mode provenance but marks counters unavailable rather than using
+   *  process-global metrics that concurrency could misattribute. */
+  counter_scope?: "request" | "unavailable" | string;
+  counter_reason?: string;
 }
 
 /** Server-side timing data from llama-server's timings object. */
@@ -5283,6 +5361,13 @@ export function createOpenAIStreamAdapter(
       const activeModel = runtime.models.find(
         (m) => m.id === params.checkpoint,
       );
+      // Pin base-vs-adapter state on both the foreground request and the later
+      // same-model audit.  Leaving it undefined means “whatever the shared model
+      // currently has enabled”, which is unsafe once another thread can run between
+      // the task and its audit.  If the model row itself is unknown, preserve the
+      // old omitted behavior rather than guessing.
+      const effectiveUseAdapter =
+        useAdapter ?? (activeModel ? activeModel.isLora : undefined);
       // The same owner the settings panel asks, so the body and the panel cannot disagree
       // about the model they both describe. A catalog row would: /api/models/list can
       // replace the row a load minted, and the variant / native path token still classify
@@ -5365,7 +5450,7 @@ export function createOpenAIStreamAdapter(
               min_p: params.minP,
               repetition_penalty: params.repetitionPenalty,
               presence_penalty: params.presencePenalty,
-              ...(useAdapter === undefined ? {} : { use_adapter: useAdapter }),
+              ...(effectiveUseAdapter === undefined ? {} : { use_adapter: effectiveUseAdapter }),
             },
             runSignal,
           );
@@ -5906,6 +5991,7 @@ export function createOpenAIStreamAdapter(
       let serverMetadata: {
         usage?: ServerUsage;
         timings?: ServerTimings;
+        speculative?: ServerSpeculative;
       } | null = null;
 
       // Colab-style proxies can swallow fetch aborts, so also POST /inference/cancel explicitly.
@@ -6462,7 +6548,7 @@ export function createOpenAIStreamAdapter(
             cancel_id: cancelId,
             ...(sandboxSessionId ? { session_id: sandboxSessionId } : {}),
             ...(resolvedThreadId ? { thread_id: resolvedThreadId } : {}),
-            ...(useAdapter === undefined ? {} : { use_adapter: useAdapter }),
+            ...(effectiveUseAdapter === undefined ? {} : { use_adapter: effectiveUseAdapter }),
             ...(supportsReasoning
               ? reasoningStyle === "enable_thinking_effort"
                 // GLM-5.2-style gate plus level: disabling sends enable_thinking=false, enabling sends
@@ -7281,6 +7367,9 @@ export function createOpenAIStreamAdapter(
                   usage: chunk.usage,
                   timings: (chunk as Record<string, unknown>).timings as
                     | ServerTimings
+                    | undefined,
+                  speculative: (chunk as Record<string, unknown>).speculative as
+                    | ServerSpeculative
                     | undefined,
                 };
                 if (chunk.choices?.length === 0) continue;
@@ -8223,6 +8312,7 @@ export function createOpenAIStreamAdapter(
           !isExternalRequest &&
           !isHermesLearningReviewRequest(latestUserText) &&
           !isHelixSelfCriticRequest(latestUserText) &&
+          !isHelixSelfAuditRequest(latestUserText) &&
           latestUserText.trim() &&
           displayAssistantRawText.trim()
         ) {
@@ -8236,9 +8326,45 @@ export function createOpenAIStreamAdapter(
           }).catch(() => undefined);
           scheduleSelfReflect({
             threadId: resolvedThreadId ?? undefined,
+            sessionId: sandboxSessionId ?? resolvedThreadId ?? undefined,
+            turnId: cancelId,
             userText: latestUserText,
             assistantText: displayAssistantRawText,
             checkpoint: params.checkpoint,
+            // Resolve an omitted compare toggle to the selected model row NOW,
+            // before another request can mutate the shared adapter state.
+            useAdapter: effectiveUseAdapter,
+            telemetry: {
+              prompt_tokens: meta?.usage?.prompt_tokens ?? 0,
+              completion_tokens: meta?.usage?.completion_tokens ?? finalTokenCount,
+              cached_tokens: cachedTokens,
+              prefill_ms: serverPromptEvalTime ?? null,
+              decode_ms: meta?.timings?.predicted_ms ?? null,
+              ttft_ms: firstTokenTime ?? null,
+              latency_ms: Math.max(0, finishedAt - streamStartTime),
+              context_compaction: promptWasShortened(contextTruncation),
+              context_truncation: contextTruncation ?? null,
+              speculative_requested: meta?.speculative?.requested ?? "",
+              speculative_engaged: meta?.speculative?.engaged ?? meta?.speculative?.mode ?? "",
+              accepted_drafts: meta?.speculative?.accepted_tokens ?? 0,
+              rejected_drafts: Math.max(
+                0,
+                (meta?.speculative?.draft_tokens ?? 0) -
+                  (meta?.speculative?.accepted_tokens ?? 0),
+              ),
+              speculative_sidecar_ok: Boolean(meta?.speculative?.used),
+              speculative_counter_scope: meta?.speculative?.counter_scope ?? "",
+              speculative_counter_reason: meta?.speculative?.counter_reason ?? "",
+              runtime_config: {
+                model: params.checkpoint,
+                backend: isMlxRequest
+                  ? "mlx"
+                  : runtime.loadedIsGguf
+                    ? "llama.cpp"
+                    : "transformers",
+                speculative: meta?.speculative ?? null,
+              },
+            },
             force: Boolean(
               contextTruncation &&
                 (contextTruncation as { handoff?: boolean; checkpoint_started?: boolean })

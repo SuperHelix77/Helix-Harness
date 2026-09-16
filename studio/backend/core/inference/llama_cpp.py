@@ -32089,6 +32089,7 @@ class LlamaCppBackend:
         # MAY BLOCK: recost_waiting waits for cache room. Safe at the top of a round,
         # where the previous round's request has completed.
         on_conversation_grew: Optional[Callable[[list], None]] = None,
+        helix_turn_id: Optional[str] = None,
     ) -> Generator[dict, None, None]:
         """
         Agentic loop: let the model call tools, execute them, and continue.
@@ -34656,6 +34657,7 @@ class LlamaCppBackend:
                                 thread_id = thread_id,
                                 rag_scope = rag_scope,
                                 disable_sandbox = bypass_permissions,
+                                helix_turn_id = helix_turn_id,
                             )
                             # Same branch the forced recall is filtered against, so a
                             # model-initiated search cannot reach a sibling response the

@@ -12,6 +12,7 @@ not auto-promote a newly trained adapter.
 from __future__ import annotations
 
 import json
+import hashlib
 import asyncio
 import re
 import tempfile
@@ -95,6 +96,9 @@ class SelfTrainingExampleRequest(BaseModel):
     sourceThreadId: str | None = Field(default = None, max_length = 200)
     score: float | None = Field(default = None, ge = 0, le = 1)
     critique: str | None = Field(default = None, max_length = 4_000)
+    eligibleForTraining: bool = False
+    sourceTrajectoryId: str | None = Field(default = None, max_length = 200)
+    evidenceIds: list[str] = Field(default_factory = list, max_length = 64)
 
 
 class SelfTrainingEvaluationRequest(BaseModel):
@@ -147,7 +151,12 @@ def _empty_state() -> dict[str, Any]:
         "lastJobId": None,
         "lastEvaluation": None,
         "lastRecommendation": None,
+        "trainingQualifiedOnly": False,
+        "activeDatasetSnapshot": None,
+        "activeDatasetSha256": None,
+        "activeDatasetExampleCount": 0,
         "lastError": None,
+        "lastRecovery": None,
         "updatedAt": int(time.time() * 1_000),
     }
 
@@ -184,7 +193,159 @@ def _write_state(state: dict[str, Any]) -> None:
     temporary.replace(path)
 
 
-def _write_dataset(state: dict[str, Any]) -> None:
+def _qualified_examples(state: dict[str, Any]) -> list[dict[str, Any]]:
+    return [item for item in state.get("examples", []) if item.get("eligibleForTraining") is True]
+
+
+def _autonomous_qlora_policy_allows(state: dict[str, Any]) -> bool:
+    if not state.get("enabled", True) or not state.get("autoTrain"):
+        return False
+    if len(_qualified_examples(state)) < int(state.get("minExamples", 8)):
+        return False
+    try:
+        from routes.learning import _read_state as _read_learning_state
+
+        learning = _read_learning_state()
+    except Exception:
+        return False
+    return (
+        learning.get("decisionMode") == "autonomous"
+        and learning.get("allowQloraTraining") is True
+    )
+
+
+def _autonomous_qlora_admission(state: dict[str, Any]) -> bool:
+    """Single admission check for any autonomous training queue transition."""
+    return (
+        state.get("status") in {"idle", "error", "rejected", "needs-more-data"}
+        and _autonomous_qlora_policy_allows(state)
+    )
+
+
+def queue_hermes_training_if_allowed() -> bool:
+    """Atomically queue a qualified Hermes dataset when all user policy gates allow it."""
+    with _STATE_LOCK:
+        state = _read_state()
+        if not _autonomous_qlora_admission(state):
+            return False
+        state["status"] = "queued"
+        state["trainingQualifiedOnly"] = True
+        _write_state(state)
+        return True
+
+
+def _training_runtime_snapshot() -> tuple[str | None, bool | None]:
+    """Return the process-local training job identity without guessing on failure."""
+    try:
+        from core.training import get_training_backend
+
+        backend = get_training_backend()
+        job_id = str(getattr(backend, "current_job_id", "") or "")
+        return job_id, bool(backend.is_training_active())
+    except Exception:
+        # Reconciliation is safety logic, not a reason to break the learning UI.
+        # Unknown runtime state means "do not mutate persisted state".
+        return None, None
+
+
+def _reconcile_persisted_training_state(state: dict[str, Any]) -> tuple[bool, bool]:
+    """Reconcile crash-persisted queued/training states with the live worker.
+
+    Returns ``(changed, reschedule_autonomous)``.  A stale autonomous queue may
+    be re-run only when the CURRENT policy still allows it.  A manual queue is
+    never silently replayed after restart.  A stale ``training`` marker becomes
+    an explicit error with provenance instead of permanently blocking /start.
+    """
+    status = str(state.get("status") or "")
+    if status not in {"queued", "training"}:
+        return False, False
+    live_job_id, live_active = _training_runtime_snapshot()
+    if live_active is None:
+        return False, False
+
+    persisted_job_id = str(state.get("lastJobId") or "")
+    now = int(time.time() * 1_000)
+    if status == "training":
+        if live_active and persisted_job_id and live_job_id == persisted_job_id:
+            return False, False
+        state["status"] = "error"
+        state["lastError"] = (
+            "Recovered stale self-QLoRA training state: the persisted job is not active "
+            "in this process. Start a new run after reviewing the preserved dataset provenance."
+        )
+        state["lastRecovery"] = {
+            "kind": "stale-training",
+            "persistedJobId": persisted_job_id or None,
+            "runtimeJobId": live_job_id or None,
+            "runtimeActive": bool(live_active),
+            "recoveredAt": now,
+        }
+        state["trainingQualifiedOnly"] = False
+        return True, False
+
+    # queued: a live job belonging to this persisted run means the state write
+    # lagged the worker start; promote it to training rather than spawning twice.
+    if live_active:
+        if persisted_job_id and live_job_id == persisted_job_id:
+            state["status"] = "training"
+            state["lastRecovery"] = {
+                "kind": "queued-job-observed-running",
+                "persistedJobId": persisted_job_id,
+                "runtimeJobId": live_job_id,
+                "runtimeActive": True,
+                "recoveredAt": now,
+            }
+            return True, False
+        # Some other training owns the backend.  Preserve the queue as an error
+        # instead of attaching Helix provenance to a foreign job.
+        state["status"] = "error"
+        state["lastError"] = "Recovered queued self-QLoRA state while another training job is active."
+        state["lastRecovery"] = {
+            "kind": "queued-runtime-conflict",
+            "persistedJobId": persisted_job_id or None,
+            "runtimeJobId": live_job_id or None,
+            "runtimeActive": True,
+            "recoveredAt": now,
+        }
+        return True, False
+
+    if state.get("trainingQualifiedOnly") is True and _autonomous_qlora_policy_allows(state):
+        state["lastRecovery"] = {
+            "kind": "stale-autonomous-queue-rescheduled",
+            "persistedJobId": persisted_job_id or None,
+            "runtimeJobId": None,
+            "runtimeActive": False,
+            "recoveredAt": now,
+        }
+        # Keep status=queued; the caller schedules exactly one new background task.
+        return True, True
+
+    state["status"] = "idle"
+    state["trainingQualifiedOnly"] = False
+    state["lastError"] = None
+    state["lastRecovery"] = {
+        "kind": "stale-queue-cleared",
+        "persistedJobId": persisted_job_id or None,
+        "runtimeJobId": None,
+        "runtimeActive": False,
+        "recoveredAt": now,
+        "reason": "manual queue is not silently replayed, or autonomous policy is no longer allowed",
+    }
+    return True, False
+
+
+def _training_row(example: dict[str, Any]) -> str:
+    # Evaluator metadata and self-critique never become target text.
+    row = {
+        "messages": [
+            {"role": "user", "content": example["prompt"]},
+            {"role": "assistant", "content": example["completion"]},
+        ]
+    }
+    return json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n"
+
+
+def _write_dataset(state: dict[str, Any], *, qualified_only: bool = False) -> None:
     path = _dataset_path()
     ensure_dir(path.parent)
     with tempfile.NamedTemporaryFile(
@@ -192,18 +353,32 @@ def _write_dataset(state: dict[str, Any]) -> None:
         prefix = ".task-examples-", suffix = ".jsonl", delete = False,
     ) as handle:
         temporary = Path(handle.name)
-        for example in state.get("examples", []):
-            # Training receives only the ChatML conversation. Scores and critiques
-            # stay in state as evaluator metadata, never as target text.
-            row = {
-                "messages": [
-                    {"role": "user", "content": example["prompt"]},
-                    {"role": "assistant", "content": example["completion"]},
-                ]
-            }
-            handle.write(json.dumps(row, ensure_ascii = False) + "\n")
+        examples = _qualified_examples(state) if qualified_only else state.get("examples", [])
+        for example in examples:
+            handle.write(_training_row(example))
         handle.flush()
     temporary.replace(path)
+
+
+def _snapshot_training_dataset(
+    state: dict[str, Any], *, qualified_only: bool
+) -> tuple[Path, str, int]:
+    """Write an immutable-by-convention per-run dataset and return path/hash/count.
+
+    The training worker gets this unique path, never the mutable collection view.
+    Later chat turns therefore cannot change what an already admitted run trains on.
+    """
+    examples = _qualified_examples(state) if qualified_only else list(state.get("examples", []))
+    payload = "".join(_training_row(example) for example in examples).encode("utf-8")
+    digest = hashlib.sha256(payload).hexdigest()
+    run_dir = account_path("learning/self_qlora/runs")
+    ensure_dir(run_dir)
+    path = run_dir / f"dataset-{int(time.time() * 1_000)}-{uuid.uuid4().hex[:12]}-{digest[:12]}.jsonl"
+    # Exclusive create: no later collection path ever opens this filename for writing.
+    with path.open("xb") as handle:
+        handle.write(payload)
+        handle.flush()
+    return path, digest, len(examples)
 
 
 def _public_state(state: dict[str, Any]) -> dict[str, Any]:
@@ -211,6 +386,7 @@ def _public_state(state: dict[str, Any]) -> dict[str, Any]:
         **state,
         "datasetPath": str(_dataset_path()),
         "exampleCount": len(state.get("examples", [])),
+        "eligibleExampleCount": len(_qualified_examples(state)),
         "promotionMargin": _PROMOTION_MARGIN,
         "acceptanceCriteria": [
             "candidate intelligence score >= base score + 0.01",
@@ -346,17 +522,34 @@ async def _start_training_for_state(subject: str) -> None:
         if state.get("status") != "queued":
             return
         model_id = str(state.get("baseModelId") or "").strip()
-        if not model_id or len(state.get("examples", [])) < int(state.get("minExamples", 8)):
+        qualified_only = state.get("trainingQualifiedOnly") is True
+        candidate_examples = _qualified_examples(state) if qualified_only else state.get("examples", [])
+        if qualified_only and not _autonomous_qlora_policy_allows(state):
+            # Re-check at execution time: a user can revoke autonomous/QLoRA
+            # permission after queueing but before the background worker runs.
             state["status"] = "idle"
+            state["trainingQualifiedOnly"] = False
             _write_state(state)
             return
+        if not model_id or len(candidate_examples) < int(state.get("minExamples", 8)):
+            state["status"] = "idle"
+            state["trainingQualifiedOnly"] = False
+            _write_state(state)
+            return
+        dataset_snapshot, dataset_sha256, dataset_count = _snapshot_training_dataset(
+            state, qualified_only=qualified_only
+        )
+        state["activeDatasetSnapshot"] = str(dataset_snapshot)
+        state["activeDatasetSha256"] = dataset_sha256
+        state["activeDatasetExampleCount"] = dataset_count
+        _write_state(state)
         snapshot = state.get("baseSnapshotPath")
         request_data: dict[str, Any] = {
             "model_name": model_id,
             "training_type": "LoRA/QLoRA",
             "load_in_4bit": True,
             "max_seq_length": int(state.get("maxSeqLength", 8_192)),
-            "local_datasets": [str(_dataset_path())],
+            "local_datasets": [str(dataset_snapshot)],
             "format_type": "chatml",
             "num_epochs": 1,
             "max_steps": 32,
@@ -439,9 +632,20 @@ async def _apply_runtime_fix_for_state() -> None:
 
 
 @router.get("")
-def get_self_training(current_subject: str = Depends(get_current_subject)):
+def get_self_training(
+    background_tasks: BackgroundTasks,
+    current_subject: str = Depends(get_current_subject),
+):
+    reschedule = False
     with _STATE_LOCK:
-        return _public_state(_read_state())
+        state = _read_state()
+        changed, reschedule = _reconcile_persisted_training_state(state)
+        if changed:
+            _write_state(state)
+        result = _public_state(state)
+    if reschedule:
+        background_tasks.add_task(_start_training_for_state, current_subject)
+    return result
 
 
 @router.post("/config")
@@ -479,14 +683,9 @@ async def set_self_training_recommendation(
             "advisoryOnly": True,
         }
         if payload.action == "qlora":
-            from routes.learning import _read_state as _read_learning_state
-
-            learning_state = _read_learning_state()
-            enough = len(state.get("examples", [])) >= int(state.get("minExamples", 8))
-            autonomous = learning_state.get("decisionMode") == "autonomous"
-            allowed = learning_state.get("allowQloraTraining") is True
-            if autonomous and allowed and state.get("autoTrain") and enough and state.get("status") in {"idle", "error", "rejected", "needs-more-data"}:
+            if _autonomous_qlora_admission(state):
                 state["status"] = "queued"
+                state["trainingQualifiedOnly"] = True
                 schedule = True
         elif payload.action == "runtime-fix":
             state["status"] = "runtime-fix-recommended"
@@ -527,13 +726,57 @@ def set_self_training_baseline(
         return _public_state(state)
 
 
+def record_hermes_qualified_candidate(
+    *,
+    model_id: str,
+    prompt: str,
+    completion: str,
+    source_trajectory_id: str,
+    evidence_ids: list[str],
+    source_trajectory_ids: list[str] | None = None,
+    evidence_sha256: str | None = None,
+    source_thread_id: str | None = None,
+) -> bool:
+    """Stage an evidence-linked candidate. Hermes is the only internal caller."""
+    if not model_id.strip() or not prompt.strip() or not completion.strip() or not source_trajectory_id.strip():
+        return False
+    with _STATE_LOCK:
+        state = _read_state()
+        if not state.get("enabled", True):
+            return False
+        baseline = str(state.get("baseModelId") or "").strip()
+        if baseline and baseline != model_id.strip():
+            return False
+        if not baseline:
+            state["baseModelId"] = model_id.strip()
+        if any(item.get("sourceTrajectoryId") == source_trajectory_id for item in state.get("examples", [])):
+            return False
+        example = {
+            "id": uuid.uuid4().hex,
+            "modelId": model_id.strip(),
+            "prompt": prompt.strip()[:20_000],
+            "completion": completion.strip()[:24_000],
+            "sourceThreadId": source_thread_id,
+            "score": None,
+            "critique": "Hermes-qualified repeated behavioral candidate",
+            "eligibleForTraining": True,
+            "sourceTrajectoryId": source_trajectory_id.strip()[:200],
+            "sourceTrajectoryIds": [str(item)[:200] for item in (source_trajectory_ids or [source_trajectory_id])[:64]],
+            "evidenceIds": [str(item)[:200] for item in evidence_ids[:64]],
+            "evidenceSha256": str(evidence_sha256 or "")[:128] or None,
+            "createdAt": int(time.time() * 1_000),
+        }
+        state["examples"] = [*state.get("examples", []), example][-_MAX_EXAMPLES:]
+        _write_state(state)
+        return True
+
+
 @router.post("/examples")
 async def record_self_training_example(
     payload: SelfTrainingExampleRequest,
     background_tasks: BackgroundTasks,
     current_subject: str = Depends(get_current_subject),
 ):
-    schedule = False
     with _STATE_LOCK:
         state = _read_state()
         if not state.get("enabled", True):
@@ -551,18 +794,16 @@ async def record_self_training_example(
             "sourceThreadId": payload.sourceThreadId,
             "score": payload.score,
             "critique": payload.critique,
+            # Qualification is an internal Hermes capability, never a client assertion.
+            "eligibleForTraining": False,
+            "sourceTrajectoryId": None,
+            "evidenceIds": [],
             "createdAt": int(time.time() * 1_000),
         }
         state["examples"] = [*state.get("examples", []), example][-_MAX_EXAMPLES:]
         _write_dataset(state)
-        enough = len(state["examples"]) >= int(state.get("minExamples", 8))
-        if state.get("autoTrain") and enough and state.get("status") in {"idle", "error", "rejected", "needs-more-data"}:
-            state["status"] = "queued"
-            schedule = True
         _write_state(state)
         result = {"recorded": True, **_public_state(state)}
-    if schedule:
-        background_tasks.add_task(_start_training_for_state, current_subject)
     return result
 
 
@@ -571,20 +812,34 @@ async def start_self_training(
     background_tasks: BackgroundTasks,
     current_subject: str = Depends(get_current_subject),
 ):
+    reschedule = False
     with _STATE_LOCK:
         state = _read_state()
-        if not state.get("enabled", True):
+        changed, reschedule = _reconcile_persisted_training_state(state)
+        if changed:
+            _write_state(state)
+        if reschedule:
+            result = {"queued": True, "recovered": True, **_public_state(state)}
+        else:
+            result = None
+        if result is not None:
+            pass
+        elif not state.get("enabled", True):
             raise HTTPException(status_code = 409, detail = "Self-QLoRA collection is disabled in the sidebar.")
-        if not state.get("baseModelId"):
+        elif not state.get("baseModelId"):
             raise HTTPException(status_code = 400, detail = "Load a model and record a task before starting self-QLoRA.")
-        if len(state.get("examples", [])) < int(state.get("minExamples", 8)):
+        elif len(state.get("examples", [])) < int(state.get("minExamples", 8)):
             raise HTTPException(status_code = 400, detail = f"Self-QLoRA needs at least {state.get('minExamples', 8)} bounded task examples.")
-        if state.get("status") in {"queued", "training"}:
+        elif state.get("status") in {"queued", "training"}:
             raise HTTPException(status_code = 409, detail = "Self-QLoRA is already queued or training.")
-        state["status"] = "queued"
-        _write_state(state)
+        elif result is None:
+            state["status"] = "queued"
+            state["trainingQualifiedOnly"] = False
+            _write_dataset(state, qualified_only=False)
+            _write_state(state)
+            result = {"queued": True, **_public_state(state)}
     background_tasks.add_task(_start_training_for_state, current_subject)
-    return {"queued": True, **_public_state(state)}
+    return result
 
 
 @router.post("/evaluate")

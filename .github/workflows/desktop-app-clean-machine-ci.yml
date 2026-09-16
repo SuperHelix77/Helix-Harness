@@ -207,6 +207,16 @@ jobs:
             echo "::error::no bundled install.sh in the app"
             exit 1
           fi
+          HELIX_BACKEND="$APP/Contents/Resources/helix-backend"
+          test -f "$HELIX_BACKEND/state/tool_policy.py" || {
+            echo "::error::no bundled Helix backend tool policy"; exit 1;
+          }
+          test -f "$HELIX_BACKEND/core/helix_engine/controller.py" || {
+            echo "::error::no bundled Helix adaptive controller"; exit 1;
+          }
+          test -f "$HELIX_BACKEND/core/helix_engine/training_targets.py" || {
+            echo "::error::no bundled Helix training-target receipt implementation"; exit 1;
+          }
 
       - name: Run the bundled installer, the path first launch takes
         run: |
@@ -221,6 +231,7 @@ jobs:
           SH="$APP/Contents/Resources/install.sh"
           rc=0
           env -u UNSLOTH_STUDIO_HOME \
+            HELIX_HARNESS_BACKEND_OVERLAY="$APP/Contents/Resources/helix-backend" \
             bash "$SH" --tauri \
             < /dev/null 2>&1 | tee logs/bundled-install.log || rc=$?
           echo "bundled installer exit code: $rc"
@@ -234,6 +245,20 @@ jobs:
           # First launch installs the native runtime stack. All representative wheels
           # must load without uv's developer-only libpython ID patch.
           "$PY" -c "import numpy, safetensors, tokenizers, torch; print('native wheels loaded', numpy.__version__, torch.__version__)"
+          # Helix Harness must run the exact backend revision bundled with this app,
+          # not merely a same-version upstream PyPI wheel. This catches the original
+          # require_tool_access skew and missing adaptive-cycle modules.
+          "$PY" - <<'PYHELIX'
+import pathlib, studio, sys
+root = pathlib.Path(studio.__file__).resolve().parent / "backend"
+sys.path.insert(0, str(root))
+from state.tool_policy import HELIX_HARNESS_BACKEND_CONTRACT, require_tool_access
+from core.helix_engine.controller import run_closed_loop
+assert HELIX_HARNESS_BACKEND_CONTRACT == "helix.adaptive.backend.v1"
+assert callable(require_tool_access)
+assert callable(run_closed_loop)
+print("Helix backend contract loaded", HELIX_HARNESS_BACKEND_CONTRACT)
+PYHELIX
 
           if [ -f ./clean-machine.env ]; then
             # A successful install alone is insufficient: uv treats install_name_tool

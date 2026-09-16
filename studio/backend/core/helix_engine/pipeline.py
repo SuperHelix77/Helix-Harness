@@ -25,7 +25,12 @@ GATES = (
 )
 
 
-def run_adaptation_pipeline(traj: Trajectory) -> dict[str, Any]:
+def run_adaptation_pipeline(
+    traj: Trajectory,
+    *,
+    self_audit: dict[str, Any] | None = None,
+    claims: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     credit = assign_credit(traj)
     compressed = compress_counterfactual(traj)
     corrections = mine_corrections(traj)
@@ -63,7 +68,7 @@ def run_adaptation_pipeline(traj: Trajectory) -> dict[str, Any]:
         decision = "reject"
 
     critic = traj.extras.get("critic") if isinstance(traj.extras, dict) else None
-    return {
+    result = {
         "gates": list(GATES),
         "credit": credit,
         "compressed": compressed,
@@ -78,3 +83,19 @@ def run_adaptation_pipeline(traj: Trajectory) -> dict[str, Any]:
         "product": "Helix Harness",
         "critic": critic if isinstance(critic, dict) else None,
     }
+    # The adaptive cycle is post-task intelligence. It must never become a
+    # reliability dependency of the established trajectory pipeline.
+    try:
+        from .controller import run_closed_loop
+
+        result["adaptive_cycle"] = run_closed_loop(
+            traj, self_audit=self_audit, claims=claims
+        )
+    except Exception as exc:
+        result["adaptive_cycle"] = {
+            "schema_version": "helix.closed-loop.v1",
+            "available": False,
+            "error": f"{type(exc).__name__}: {exc}"[:800],
+            "fail_open": True,
+        }
+    return result

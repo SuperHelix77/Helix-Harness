@@ -46,3 +46,63 @@ def test_holdout_requires_real_backend_timing():
     assert score == 1.0
     assert speed == 0.0
     assert measured is False
+
+
+def test_reconcile_stale_training_unwedges_start_with_provenance(monkeypatch):
+    state = self_training._empty_state()
+    state.update({
+        "status": "training",
+        "lastJobId": "job-dead",
+        "trainingQualifiedOnly": True,
+    })
+    monkeypatch.setattr(self_training, "_training_runtime_snapshot", lambda: ("", False))
+
+    changed, reschedule = self_training._reconcile_persisted_training_state(state)
+
+    assert changed is True
+    assert reschedule is False
+    assert state["status"] == "error"
+    assert state["trainingQualifiedOnly"] is False
+    assert state["lastRecovery"]["kind"] == "stale-training"
+    assert state["lastRecovery"]["persistedJobId"] == "job-dead"
+
+
+def test_reconcile_stale_manual_queue_never_replays_silently(monkeypatch):
+    state = self_training._empty_state()
+    state.update({"status": "queued", "trainingQualifiedOnly": False})
+    monkeypatch.setattr(self_training, "_training_runtime_snapshot", lambda: ("", False))
+
+    changed, reschedule = self_training._reconcile_persisted_training_state(state)
+
+    assert changed is True
+    assert reschedule is False
+    assert state["status"] == "idle"
+    assert state["lastRecovery"]["kind"] == "stale-queue-cleared"
+
+
+def test_reconcile_stale_autonomous_queue_requires_current_policy(monkeypatch):
+    state = self_training._empty_state()
+    state.update({"status": "queued", "trainingQualifiedOnly": True})
+    monkeypatch.setattr(self_training, "_training_runtime_snapshot", lambda: ("", False))
+    monkeypatch.setattr(self_training, "_autonomous_qlora_policy_allows", lambda current: True)
+
+    changed, reschedule = self_training._reconcile_persisted_training_state(state)
+
+    assert changed is True
+    assert reschedule is True
+    assert state["status"] == "queued"
+    assert state["trainingQualifiedOnly"] is True
+    assert state["lastRecovery"]["kind"] == "stale-autonomous-queue-rescheduled"
+
+
+def test_reconcile_unknown_runtime_state_is_fail_open(monkeypatch):
+    state = self_training._empty_state()
+    state.update({"status": "training", "lastJobId": "job-unknown"})
+    before = dict(state)
+    monkeypatch.setattr(self_training, "_training_runtime_snapshot", lambda: (None, None))
+
+    changed, reschedule = self_training._reconcile_persisted_training_state(state)
+
+    assert changed is False
+    assert reschedule is False
+    assert state == before

@@ -73,6 +73,7 @@ from routes.inference import (
     _responses_stream,
     _openai_stream_error_sse,
     _openai_stream_usage_chunk,
+    _gguf_speculative_telemetry,
     _openai_admission_wait_stream_chunks,
     _wait_for_openai_admission_non_streaming,
     _proxy_to_external_provider,
@@ -3303,6 +3304,51 @@ class TestOpenAICompatibilityHelpers:
         assert usage["prompt_tokens"] == 0
         assert usage["completion_tokens"] == 7
         assert usage["total_tokens"] == 7
+
+    def test_stream_usage_chunk_preserves_request_scoped_speculative_stats(self):
+        """MLX per-generation speculative counters must survive the final usage event."""
+        payload = SimpleNamespace(stream_options = {"include_usage": True})
+        speculative = {
+            "mode": "dflash",
+            "requested": "dflash",
+            "engaged": "dflash",
+            "draft_model": "/tmp/dflash.safetensors",
+            "draft_tokens": 24,
+            "accepted_tokens": 18,
+            "steps": 6,
+            "used": True,
+            "counter_scope": "request",
+        }
+        line = _openai_stream_usage_chunk(
+            payload,
+            "chatcmpl-test",
+            123,
+            "model",
+            {"prompt_tokens": 8, "completion_tokens": 5, "total_tokens": 13},
+            {"prompt_n": 8, "predicted_n": 5},
+            speculative,
+        )
+
+        assert line is not None
+        parsed = json.loads(line.removeprefix("data: "))
+        assert parsed["speculative"] == speculative
+
+    def test_gguf_speculative_telemetry_never_invents_request_counters(self):
+        backend = SimpleNamespace(
+            requested_spec_mode="dflash",
+            speculative_type="draft-dflash",
+        )
+        speculative = _gguf_speculative_telemetry(backend)
+        assert speculative == {
+            "mode": "draft-dflash",
+            "requested": "dflash",
+            "engaged": "draft-dflash",
+            "counter_scope": "unavailable",
+            "counter_reason": "llama_server_has_no_request_scoped_speculative_counters",
+        }
+        assert "accepted_tokens" not in speculative
+        assert "draft_tokens" not in speculative
+        assert "used" not in speculative
 
     def test_completion_stream_monitor_reads_usage_before_client_strip(self, monkeypatch):
         import routes.inference as inf_mod

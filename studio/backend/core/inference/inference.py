@@ -1113,6 +1113,7 @@ class InferenceBackend:
         rag_scope: Optional[dict] = None,
         presence_penalty: float = 0.0,
         reasoning_prefilled: bool = False,
+        helix_turn_id: Optional[str] = None,
     ):
         """Run an agentic tool loop on top of ``generate_chat_response``.
 
@@ -1212,6 +1213,7 @@ class InferenceBackend:
             context_length = _model_info.get("context_length"),
             max_tokens = max_new_tokens,
             generation_stats_holder = _turn_stats,
+            helix_turn_id = helix_turn_id,
         )
 
     def generate_chat_response(

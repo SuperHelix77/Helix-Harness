@@ -1,7 +1,15 @@
 {
+  "build": {
+    "beforeBuildCommand": {
+      "cwd": "../..",
+      "script": "bash scripts/build_helix_macos_frontend.sh"
+    }
+  },
   "bundle": {
     "resources": {
-      "../../install.sh": "install.sh"
+      "../../install.sh": "install.sh",
+      "artifacts/helix-backend": "helix-backend",
+      "../../scripts/apply_helix_backend_overlay.py": "apply_helix_backend_overlay.py"
     },
     "macOS": {
       "signingIdentity": "-",
@@ -9,9 +17,18 @@
       "infoPlist": "./Info.plist",
       "dmg": {
         "background": "./dmg/background.tiff",
-        "windowSize": { "width": 660, "height": 400 },
-        "appPosition": { "x": 180, "y": 170 },
-        "applicationFolderPosition": { "x": 480, "y": 170 }
+        "windowSize": {
+          "width": 660,
+          "height": 400
+        },
+        "appPosition": {
+          "x": 180,
+          "y": 170
+        },
+        "applicationFolderPosition": {
+          "x": 480,
+          "y": 170
+        }
       }
     }
   }

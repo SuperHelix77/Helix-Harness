@@ -2802,6 +2802,7 @@ class ChatCompletionChunk(BaseModel):
     choices: list[ChunkChoice]
     usage: Optional[CompletionUsage] = None
     timings: Optional[dict] = None
+    speculative: Optional[dict] = None
     context_truncated: Optional[dict] = None
 
 

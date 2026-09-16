@@ -1319,7 +1319,13 @@ def _openai_passthrough_terminal_state_from_data(data) -> Optional[str]:
 
 
 def _openai_stream_usage_chunk(
-    payload, completion_id, created, model_name, stream_usage, stream_timings
+    payload,
+    completion_id,
+    created,
+    model_name,
+    stream_usage,
+    stream_timings,
+    stream_speculative = None,
 ):
     """Build the final OpenAI-standard usage chunk (choices=[], usage populated)
     for a chat stream. Returns the SSE ``data:`` line, or None when the client
@@ -1344,8 +1350,34 @@ def _openai_stream_usage_chunk(
             prompt_tokens_details = _prompt_tokens_details(_usage.get("prompt_tokens_details")),
         ),
         timings = stream_timings,
+        speculative = stream_speculative if isinstance(stream_speculative, dict) else None,
     )
     return f"data: {usage_chunk.model_dump_json(exclude_none = True)}\n\n"
+
+
+def _gguf_speculative_telemetry(llama_backend) -> dict[str, object] | None:
+    """Return only GGUF speculative facts attributable to this loaded runtime.
+
+    llama-server does not currently expose accepted/drafted speculative counters
+    scoped to one request on this integration path. Its metrics endpoint is
+    process-global and concurrent requests would make a before/after delta
+    ambiguous, so Helix must never treat those counters as trajectory evidence.
+    Requested/resolved modes are stable load configuration and are safe to report.
+    """
+    try:
+        requested = getattr(llama_backend, "requested_spec_mode", None)
+        engaged = getattr(llama_backend, "speculative_type", None)
+    except Exception:
+        return None
+    if requested is None and engaged is None:
+        return None
+    return {
+        "mode": engaged,
+        "requested": requested,
+        "engaged": engaged,
+        "counter_scope": "unavailable",
+        "counter_reason": "llama_server_has_no_request_scoped_speculative_counters",
+    }
 
 
 def _chat_chunk_sse(completion_id, created, model_name, *, delta, finish_reason) -> str:
@@ -23656,6 +23688,7 @@ async def produce_openai_chat_completions(
                     else 300,
                     session_id = payload.session_id,
                     thread_id = payload.thread_id,
+                    helix_turn_id = payload.cancel_id or completion_id,
                     rag_scope = payload.rag_scope,
                     disable_parallel_tool_use = payload.parallel_tool_calls is False,
                     # Bypass Permissions takes precedence over the confirm gate:
@@ -23959,6 +23992,7 @@ async def produce_openai_chat_completions(
                         model_name,
                         _stream_usage,
                         _stream_timings,
+                        _gguf_speculative_telemetry(llama_backend),
                     )
                     if usage_line is not None:
                         yield usage_line
@@ -24576,6 +24610,7 @@ async def produce_openai_chat_completions(
                         model_name,
                         _stream_usage,
                         _stream_timings,
+                        _gguf_speculative_telemetry(llama_backend),
                     )
                     if usage_line is not None:
                         yield usage_line
@@ -25411,6 +25446,7 @@ async def produce_openai_chat_completions(
                 else 300,
                 session_id = payload.session_id,
                 thread_id = payload.thread_id,
+                helix_turn_id = payload.cancel_id or completion_id,
                 rag_scope = payload.rag_scope,
                 # Bypass Permissions takes precedence over the confirm gate:
                 # never prompt while bypassing.
@@ -25601,6 +25637,7 @@ async def produce_openai_chat_completions(
                         model_name,
                         _stats.get("usage"),
                         _stats.get("timings"),
+                        _stats.get("speculative"),
                     )
                     if usage_line is not None:
                         yield usage_line
@@ -26168,6 +26205,7 @@ async def produce_openai_chat_completions(
                         model_name,
                         _stats.get("usage"),
                         _stats.get("timings"),
+                        _stats.get("speculative"),
                     )
                     if usage_line is not None:
                         yield usage_line
@@ -32455,6 +32493,7 @@ async def anthropic_messages(
                 tool_call_timeout = 300,
                 session_id = payload.session_id,
                 thread_id = payload.thread_id,
+                helix_turn_id = payload.cancel_id or message_id,
                 # Anthropic passthrough has no rag_scope field (RAG is local-only).
                 rag_scope = getattr(payload, "rag_scope", None),
                 disable_parallel_tool_use = _disable_parallel,

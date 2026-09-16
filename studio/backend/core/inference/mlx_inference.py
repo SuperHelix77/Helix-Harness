@@ -3767,11 +3767,17 @@ class MLXInferenceBackend:
                         speculative=(
                             {
                                 "mode": self._speculative_type,
+                                "requested": self._spec_requested_type,
+                                "engaged": self._speculative_type,
                                 "draft_model": self._spec_draft_model_path,
                                 "draft_tokens": getattr(final_response, "draft_tokens", 0),
                                 "accepted_tokens": getattr(final_response, "accepted_tokens", 0),
                                 "steps": getattr(final_response, "speculative_steps", 0),
                                 "used": True,
+                                # These counters come from this generation's response,
+                                # not a process-global metrics endpoint. Helix may use
+                                # them as trajectory-local evidence.
+                                "counter_scope": "request",
                             }
                             if use_mlx_speculative
                             else None
@@ -4206,9 +4212,14 @@ class MLXInferenceBackend:
                             speculative=(
                                 {
                                     "mode": self._speculative_type,
+                                    "requested": self._spec_requested_type,
+                                    "engaged": self._speculative_type,
                                     "draft_model": self._spec_draft_model_path,
                                     **_mlx_speculative_counters(self._spec_draft),
                                     "used": use_vlm_speculative,
+                                    # The draft object belongs to this VLM request
+                                    # lifecycle; mark the evidence scope explicitly.
+                                    "counter_scope": "request",
                                 }
                                 if use_vlm_speculative
                                 else None

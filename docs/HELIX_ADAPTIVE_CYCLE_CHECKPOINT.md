@@ -5,7 +5,7 @@ Authority: the current working `/Users/mert/llmspeed-work/Helix-Harness` filesys
 
 ## Baseline state
 
-This repository has no prior Git commit. It is an imported Unsloth Studio baseline plus the current Helix Harness additions. The cycle must preserve working chat, tool execution, model loading, DFlash/GDN, memory, QLoRA, and existing Helix Engine trajectory capture.
+Historical note: this checkpoint was written before the working baseline was committed. The preserved baseline is now commit `174e429` (`baseline: freeze working Helix Harness before adaptive cycle`). It is an imported Unsloth Studio baseline plus the Helix Harness additions present at that checkpoint. The cycle must preserve working chat, tool execution, model loading, DFlash/GDN, memory, QLoRA, and existing Helix Engine trajectory capture.
 
 Focused pre-change regression command:
 

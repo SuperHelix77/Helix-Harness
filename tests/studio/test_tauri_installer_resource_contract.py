@@ -45,7 +45,28 @@ def test_each_bundle_ships_only_the_installer_it_runs() -> None:
     # Trojan:Script/Wacatac.B!ml landed.
     assert _bundled_resources("windows") == {"../../install.ps1": "install.ps1"}
     assert _bundled_resources("linux") == {"../../install.sh": "install.sh"}
-    assert _bundled_resources("macos") == {"../../install.sh": "install.sh"}
+    assert _bundled_resources("macos") == {
+        "../../install.sh": "install.sh",
+        "artifacts/helix-backend": "helix-backend",
+        "../../scripts/apply_helix_backend_overlay.py": "apply_helix_backend_overlay.py",
+    }
+
+
+
+def test_macos_bundle_carries_the_exact_helix_backend_contract() -> None:
+    resources = _bundled_resources("macos")
+    assert resources.get("artifacts/helix-backend") == "helix-backend"
+    tool_policy = (REPO / "studio/backend/state/tool_policy.py").read_text(encoding="utf-8")
+    assert 'HELIX_HARNESS_BACKEND_CONTRACT = "helix.adaptive.backend.v1"' in tool_policy
+    install_rs = (REPO / "studio/src-tauri/src/install.rs").read_text(encoding="utf-8")
+    assert 'HELIX_HARNESS_BACKEND_OVERLAY' in install_rs
+    assert resources.get("../../scripts/apply_helix_backend_overlay.py") == "apply_helix_backend_overlay.py"
+    installer = (REPO / "install.sh").read_text(encoding="utf-8")
+    assert '_apply_helix_backend_overlay' in installer
+    applier = (REPO / "scripts/apply_helix_backend_overlay.py").read_text(encoding="utf-8")
+    assert 'helix.adaptive.backend.v1' in applier
+    update_rs = (REPO / "studio/src-tauri/src/update.rs").read_text(encoding="utf-8")
+    assert 'apply_bundled_helix_backend_overlay' in update_rs
 
 
 def test_no_installer_resource_leaks_through_the_shared_config() -> None:

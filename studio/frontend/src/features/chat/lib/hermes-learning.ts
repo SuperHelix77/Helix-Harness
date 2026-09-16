@@ -9,8 +9,10 @@ import type {
 
 export const HERMES_LEARNING_REVIEW_PREFIX = "[UNSLOTH_HERMES_LEARNING_REVIEW]";
 export const HELIX_SELF_CRITIC_PREFIX = "[HELIX_SELF_CRITIC]";
+export const HELIX_SELF_AUDIT_PREFIX = "[HELIX_SELF_AUDIT]";
 export const HERMES_LEARNING_TAG = "unsloth-learning";
 export const HELIX_SELF_CRITIC_TAG = "helix-self-critic";
+export const HELIX_SELF_AUDIT_TAG = "helix-self-audit";
 export const ON_THE_FLY_SKILL_TAG = "unsloth-skill-draft";
 export const HERMES_LEARNING_CHANGED_EVENT = "unsloth-hermes-learning-changed";
 export const HERMES_LEARNING_OPEN_EVENT = "unsloth-open-hermes-learning";
@@ -28,6 +30,40 @@ export type HelixSelfCritic = {
   skillTitle?: string;
   skillContent?: string;
   reason?: string;
+};
+
+export type HelixEvidenceClaim = {
+  claim_id?: string;
+  claim: string;
+  supporting_evidence?: string[];
+  evidence_refs?: string[];
+  contradicting_evidence?: string[];
+  missing_evidence?: string[];
+  confidence?: number;
+};
+
+export type HelixSelfAudit = {
+  objective: string;
+  achieved: boolean | null;
+  contributing_actions: string[];
+  unnecessary_actions: string[];
+  failures: string[];
+  retries: string[];
+  rediscovered_information: string[];
+  excess_retrieval: string[];
+  avoidable_cache_disruption: string[];
+  tool_selection_correct: boolean | null;
+  expensive_resource_misuse: string[];
+  overclaimed_claims: string[];
+  stopped_too_early: boolean;
+  continued_too_long: boolean;
+  better_trajectory: string[];
+  reusable_lessons: string[];
+  likely_behavioral_pattern: boolean;
+  recommendation: "IGNORE" | "RUNTIME_POLICY" | "MEMORY" | "SKILL" | "QLORA_CANDIDATE" | "CAPABILITY_GAP";
+  recommendation_reason: string;
+  self_assessment_confidence: number;
+  claims: HelixEvidenceClaim[];
 };
 
 export function openHermesLearningManager(): void {
@@ -106,6 +142,212 @@ export function hermesLearningReviewPrompt(focus: string): string {
 
 export function isHermesLearningReviewRequest(text: string): boolean {
   return text.includes(HERMES_LEARNING_REVIEW_PREFIX);
+}
+
+export function helixSelfAuditPrompt(
+  focus: string,
+  observableArtifacts: Record<string, unknown>,
+): string {
+  const rawTools = Array.isArray(observableArtifacts.tool_steps)
+    ? observableArtifacts.tool_steps.slice(-16)
+    : [];
+  const boundedTools = rawTools.map((value) => {
+    if (!value || typeof value !== "object") return value;
+    const raw = value as Record<string, unknown>;
+    return {
+      index: raw.index,
+      evidence_ids: Array.isArray(raw.evidence_ids)
+        ? raw.evidence_ids.filter((item): item is string => typeof item === "string").slice(0, 4)
+        : [],
+      name: typeof raw.name === "string" ? raw.name.slice(0, 160) : raw.name,
+      arguments: typeof raw.arguments === "string" ? raw.arguments.slice(0, 600) : raw.arguments,
+      result: typeof raw.result === "string" ? raw.result.slice(0, 1_200) : raw.result,
+      useful_hint: raw.useful_hint,
+      error: typeof raw.error === "string" ? raw.error.slice(0, 500) : raw.error,
+      retry: raw.retry,
+    };
+  });
+  const objective = String(observableArtifacts.objective ?? "").slice(0, 4_000);
+  const finalResult = String(observableArtifacts.final_result ?? "").slice(0, 4_000);
+  const telemetry = boundAuditJsonValue(observableArtifacts.telemetry ?? {}, 0);
+  let artifactPayload: Record<string, unknown> = {
+    objective,
+    final_result: finalResult,
+    telemetry,
+    tool_steps: boundedTools,
+  };
+  let artifacts = JSON.stringify(artifactPayload);
+  if (artifacts.length > 28_000) {
+    artifactPayload = {
+      objective: objective.slice(0, 3_000),
+      final_result: finalResult.slice(0, 3_000),
+      telemetry: summarizeAuditTelemetry(observableArtifacts.telemetry),
+      tool_steps: boundedTools.slice(-8),
+      helix_artifact_compaction: "structured",
+    };
+    artifacts = JSON.stringify(artifactPayload);
+  }
+  if (artifacts.length > 28_000) {
+    artifactPayload = {
+      objective: objective.slice(0, 2_000),
+      final_result: finalResult.slice(0, 2_000),
+      telemetry: { helix_artifact_compaction: "telemetry_omitted_for_size" },
+      tool_steps: boundedTools.slice(-4).map((value) => {
+        if (!value || typeof value !== "object") return value;
+        const raw = value as Record<string, unknown>;
+        return {
+          ...raw,
+          arguments: typeof raw.arguments === "string" ? raw.arguments.slice(0, 300) : raw.arguments,
+          result: typeof raw.result === "string" ? raw.result.slice(0, 600) : raw.result,
+        };
+      }),
+      helix_artifact_compaction: "minimal",
+    };
+    artifacts = JSON.stringify(artifactPayload);
+  }
+  return [
+    HELIX_SELF_AUDIT_PREFIX,
+    "Audit the task you just performed using ONLY the observable artifacts below. Do not reveal or reconstruct hidden chain-of-thought.",
+    "Judge objective completion, useful and unnecessary actions, failures/retries, repeated rediscovery/retrieval, cache/context waste, tool choice, resource escalation, unsupported claims, stopping behavior, a shorter equivalent trajectory, reusable lessons, and whether the issue is likely a repeated behavioral pattern.",
+    "Your self-report is advisory. Hermes will compare it with tests, tool outputs, telemetry and other objective evidence. You cannot authorize training.",
+    "For claims, supporting_evidence is descriptive only. Put evidence IDs from the observable artifact list into evidence_refs; only backend-resolved evidence IDs can count as proof.",
+    "Recommendation must be exactly one of IGNORE, RUNTIME_POLICY, MEMORY, SKILL, QLORA_CANDIDATE, CAPABILITY_GAP. QLORA_CANDIDATE is appropriate only for a repeated behavioral tendency, never a one-off error.",
+    `Return exactly one tag: <${HELIX_SELF_AUDIT_TAG}>{"objective":"","achieved":true,"contributing_actions":[],"unnecessary_actions":[],"failures":[],"retries":[],"rediscovered_information":[],"excess_retrieval":[],"avoidable_cache_disruption":[],"tool_selection_correct":true,"expensive_resource_misuse":[],"overclaimed_claims":[],"stopped_too_early":false,"continued_too_long":false,"better_trajectory":[],"reusable_lessons":[],"likely_behavioral_pattern":false,"recommendation":"IGNORE","recommendation_reason":"","self_assessment_confidence":0.5,"claims":[{"claim_id":"","claim":"","supporting_evidence":[],"evidence_refs":[],"contradicting_evidence":[],"missing_evidence":[],"confidence":0.5}]}</${HELIX_SELF_AUDIT_TAG}>`,
+    focus.trim() ? `Task summary: ${focus.trim()}` : "Task summary: completed task.",
+    `Observable artifacts JSON: ${artifacts}`,
+  ].join("\n");
+}
+
+function boundAuditJsonValue(value: unknown, depth: number): unknown {
+  if (value === null || typeof value === "boolean") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value : String(value);
+  if (typeof value === "string") return value.slice(0, 800);
+  if (depth >= 4) return "[depth-limited]";
+  if (Array.isArray(value)) {
+    const bounded = value.slice(0, 32).map((item) => boundAuditJsonValue(item, depth + 1));
+    if (value.length > bounded.length) bounded.push(`[${value.length - bounded.length} more items]`);
+    return bounded;
+  }
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>);
+    const bounded: Record<string, unknown> = {};
+    for (const [key, item] of entries.slice(0, 64)) {
+      bounded[key.slice(0, 120)] = boundAuditJsonValue(item, depth + 1);
+    }
+    if (entries.length > 64) bounded.helix_omitted_keys = entries.length - 64;
+    return bounded;
+  }
+  return String(value ?? "").slice(0, 800);
+}
+
+function summarizeAuditTelemetry(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { helix_artifact_compaction: "telemetry_unavailable" };
+  }
+  const raw = value as Record<string, unknown>;
+  const keys = [
+    "prompt_tokens", "promptTokens", "cached_tokens", "cachedTokens", "stable_prefix_tokens",
+    "newly_evaluated_tokens", "prefill_ms", "decode_ms", "ttft_ms", "context_compaction",
+    "context_compactions", "prompt_reconstruction", "prompt_reconstructions", "system_prompt_change",
+    "system_prompt_changes", "tool_schema_change", "tool_schema_changes", "context_reorder",
+    "context_reorders", "repeated_context_insertions", "speculative_requested", "speculative_engaged",
+    "accepted_drafts", "acceptedDrafts", "rejected_drafts", "rejectedDrafts", "runtime_config",
+    "runtimeConfig", "latency_ms", "completion_tokens", "completionTokens", "trajectory_id",
+    "objective_verified",
+  ];
+  const summary: Record<string, unknown> = { helix_artifact_compaction: "telemetry_summary" };
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(raw, key)) {
+      summary[key] = boundAuditJsonValue(raw[key], 0);
+    }
+  }
+  const omitted = Object.keys(raw).filter((key) => !keys.includes(key)).length;
+  if (omitted) summary.helix_omitted_keys = omitted;
+  return summary;
+}
+
+export function isHelixSelfAuditRequest(text: string): boolean {
+  return text.includes(HELIX_SELF_AUDIT_PREFIX);
+}
+
+function auditStrings(value: unknown, limit = 32): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string").slice(0, limit)
+    : [];
+}
+
+const HELIX_EVIDENCE_REF_RE = /^(?:trajectory:objective_verified|benchmark:speed|speculation:accepted|tool:\d+:(?:error|result|verification))$/;
+
+export function parseHelixSelfAudit(text: string): HelixSelfAudit | null {
+  const match = text.match(
+    new RegExp(`<${HELIX_SELF_AUDIT_TAG}>\\s*([\\s\\S]*?)\\s*</${HELIX_SELF_AUDIT_TAG}>`, "i"),
+  );
+  if (!match?.[1]) return null;
+  let value: unknown;
+  try { value = JSON.parse(match[1]); } catch { return null; }
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const allowed = new Set(["IGNORE", "RUNTIME_POLICY", "MEMORY", "SKILL", "QLORA_CANDIDATE", "CAPABILITY_GAP"]);
+  const recommendation = String(raw.recommendation ?? "IGNORE").toUpperCase();
+  if (!allowed.has(recommendation)) return null;
+  const claims = Array.isArray(raw.claims)
+    ? raw.claims
+        .filter((item): item is Record<string, unknown> => Boolean(
+          item && typeof item === "object" && typeof (item as Record<string, unknown>).claim === "string",
+        ))
+        .slice(0, 32)
+        .map((claim) => ({
+          claim_id: typeof claim.claim_id === "string" ? claim.claim_id.slice(0, 200) : undefined,
+          claim: String(claim.claim).slice(0, 2_000),
+          supporting_evidence: auditStrings(claim.supporting_evidence, 32),
+          evidence_refs: auditStrings(claim.evidence_refs, 32)
+            .map((item) => item.slice(0, 200))
+            .filter((item) => HELIX_EVIDENCE_REF_RE.test(item)),
+          contradicting_evidence: auditStrings(claim.contradicting_evidence, 32),
+          missing_evidence: auditStrings(claim.missing_evidence, 32),
+          confidence: typeof claim.confidence === "number"
+            ? Math.max(0, Math.min(1, claim.confidence))
+            : 0.5,
+        }))
+    : [];
+  const confidenceRaw = typeof raw.self_assessment_confidence === "number" ? raw.self_assessment_confidence : 0.5;
+  return {
+    objective: typeof raw.objective === "string" ? raw.objective.slice(0, 4_000) : "",
+    achieved: typeof raw.achieved === "boolean" ? raw.achieved : null,
+    contributing_actions: auditStrings(raw.contributing_actions),
+    unnecessary_actions: auditStrings(raw.unnecessary_actions),
+    failures: auditStrings(raw.failures),
+    retries: auditStrings(raw.retries),
+    rediscovered_information: auditStrings(raw.rediscovered_information),
+    excess_retrieval: auditStrings(raw.excess_retrieval),
+    avoidable_cache_disruption: auditStrings(raw.avoidable_cache_disruption),
+    tool_selection_correct: typeof raw.tool_selection_correct === "boolean" ? raw.tool_selection_correct : null,
+    expensive_resource_misuse: auditStrings(raw.expensive_resource_misuse),
+    overclaimed_claims: auditStrings(raw.overclaimed_claims),
+    stopped_too_early: raw.stopped_too_early === true,
+    continued_too_long: raw.continued_too_long === true,
+    better_trajectory: auditStrings(raw.better_trajectory),
+    reusable_lessons: auditStrings(raw.reusable_lessons),
+    likely_behavioral_pattern: raw.likely_behavioral_pattern === true,
+    recommendation: recommendation as HelixSelfAudit["recommendation"],
+    recommendation_reason: typeof raw.recommendation_reason === "string" ? raw.recommendation_reason.slice(0, 2_000) : "",
+    self_assessment_confidence: Math.max(0, Math.min(1, confidenceRaw)),
+    claims,
+  };
+}
+
+export function auditToLegacyCritic(audit: HelixSelfAudit): HelixSelfCritic {
+  const rec: LearningRecommendationAction = "none";
+  return {
+    finished: audit.achieved === true ? "full" : audit.achieved === false ? "none" : "partial",
+    rightTools: audit.tool_selection_correct !== false,
+    rightSkills: true,
+    tooManyTools: audit.unnecessary_actions.length > 0 || audit.excess_retrieval.length > 0,
+    recommendation: rec,
+    notes: audit.recommendation_reason,
+    reason: audit.recommendation_reason,
+    skillContent: audit.reusable_lessons.join("\n").slice(0, 8_000),
+  };
 }
 
 export function helixSelfCriticPrompt(focus: string): string {

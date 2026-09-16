@@ -146,11 +146,12 @@ def test_execute_tool_wrapper_appends_a_trajectory_step(monkeypatch):
     assert "a.py" in steps[-1].arguments
 
 
-def test_execute_tool_capture_prefers_session_id_over_thread_id(monkeypatch):
+def test_execute_tool_capture_isolates_session_and_thread(monkeypatch):
+    from core.helix_engine.capture import capture_session_key
     from core.inference import tools
 
-    clear_session("sess-1")
-    clear_session("thread-9")
+    key = capture_session_key("sess-1", "thread-9")
+    clear_session(key)
     monkeypatch.setattr(tools, "_EXECUTE_TOOL_IMPL", lambda *args, **kwargs: "ok")
     tools.execute_tool(
         "read_file",
@@ -158,5 +159,6 @@ def test_execute_tool_capture_prefers_session_id_over_thread_id(monkeypatch):
         session_id="sess-1",
         thread_id="thread-9",
     )
-    assert session_steps("sess-1")[-1].name == "read_file"
+    assert session_steps(key)[-1].name == "read_file"
+    assert session_steps("sess-1") == []
     assert session_steps("thread-9") == []

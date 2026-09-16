@@ -587,6 +587,27 @@ fn spawn_script(
         crate::preflight::expected_backend_version(),
     );
 
+    // A production Helix Harness bundle carries the exact Python backend source
+    // that was built with this native shell.  The upstream installer still lays
+    // down the released dependency stack first; this source overlay is applied
+    // after setup so a same-version PyPI wheel cannot silently replace newer
+    // Harness tool-policy / adaptive-cycle code.  Debug builds already use
+    // --local and therefore do not need the bundled overlay.
+    #[cfg(target_os = "macos")]
+    if !cfg!(debug_assertions) {
+        if let Some(resource_dir) = script.parent() {
+            let helix_backend = resource_dir.join("helix-backend");
+            if helix_backend.is_dir() {
+                cmd.env("HELIX_HARNESS_BACKEND_OVERLAY", helix_backend);
+            } else {
+                warn!(
+                    "Production Helix backend overlay is missing beside {}",
+                    script.display()
+                );
+            }
+        }
+    }
+
     // We decode this child as UTF-8 below, so its Python descendants must emit
     // UTF-8 or the log fills with U+FFFD. The .ps1 entry points set these too;
     // this covers any path reaching Python without them.

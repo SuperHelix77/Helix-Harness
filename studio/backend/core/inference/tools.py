@@ -10291,6 +10291,10 @@ def execute_tool(
     context_tokens = _UNSET_CONTEXT_TOKENS,
     search_images: bool = False,
     result_budget_tokens: int | None = None,
+    helix_turn_id: str | None = None,
+    helix_verification_kind: str | None = None,
+    helix_verification_claim: str | None = None,
+    helix_verification_subject: str | None = None,
 ) -> str:
     """Execute a tool by name with the given arguments; returns a string.
 
@@ -10303,7 +10307,11 @@ def execute_tool(
     tools; web_search / MCP are unchanged. ``output_callback``: optional ``callable(str)`` invoked
     with incremental stdout/stderr chunks while python/terminal executions run. Purely
     observational: the returned result string is identical with or without it. ``website_policy``:
-    hidden server-validated domain limits for web_search.
+    hidden server-validated domain limits for web_search. ``helix_verification_kind``,
+    ``helix_verification_claim`` and ``helix_verification_subject`` are backend-only provenance for
+    Helix capture; model-supplied tool arguments never populate them. The claim/subject bind a
+    verifier run to what it actually established so a genuine verifier cannot be cited for an
+    unrelated assertion.
     """
     from state.tool_policy import require_tool_access
 
@@ -10556,18 +10564,59 @@ def execute_tool(
 _EXECUTE_TOOL_IMPL = execute_tool
 
 
-@functools.wraps(_EXECUTE_TOOL_IMPL)
-def execute_tool(*args, **kwargs):
-    result = _EXECUTE_TOOL_IMPL(*args, **kwargs)
+def _helix_capture_tool_outcome(args, kwargs, result = None, error: BaseException | None = None) -> None:
+    """Best-effort observation only; never changes tool semantics."""
     try:
-        from core.helix_engine.capture import record_tool_execution
+        from core.helix_engine.capture import capture_session_key, record_tool_execution
 
         tool_name = args[0] if args else kwargs.get("name")
         arguments = args[1] if len(args) > 1 else kwargs.get("arguments") or {}
-        session_id = kwargs.get("session_id") or kwargs.get("thread_id") or "default"
-        record_tool_execution(str(session_id), str(tool_name), arguments, str(result))
-    except Exception:
+        capture_key = capture_session_key(
+            kwargs.get("session_id"),
+            kwargs.get("thread_id"),
+            kwargs.get("helix_turn_id"),
+        )
+        if error is not None:
+            try:
+                detail = str(error)
+            except BaseException:
+                detail = "<unprintable exception>"
+            text = f"Error: {type(error).__name__}: {detail}"
+        else:
+            try:
+                text = str(result)
+            except BaseException:
+                text = "<unprintable tool result>"
+                # A verifier whose result cannot be observed cannot produce proof.
+                kwargs = {
+                    **kwargs,
+                    "helix_verification_kind": None,
+                    "helix_verification_claim": None,
+                    "helix_verification_subject": None,
+                }
+        record_tool_execution(
+            capture_key,
+            str(tool_name),
+            arguments,
+            text,
+            verification_kind=kwargs.get("helix_verification_kind"),
+            verification_claim=kwargs.get("helix_verification_claim"),
+            verification_subject=kwargs.get("helix_verification_subject"),
+        )
+    except BaseException:
+        # Helix Engine is instrumentation, never a tool reliability dependency.
         pass
+
+
+@functools.wraps(_EXECUTE_TOOL_IMPL)
+def execute_tool(*args, **kwargs):
+    try:
+        result = _EXECUTE_TOOL_IMPL(*args, **kwargs)
+    except BaseException as exc:
+        # Record best-effort, then re-raise the exact original exception object.
+        _helix_capture_tool_outcome(args, kwargs, error=exc)
+        raise
+    _helix_capture_tool_outcome(args, kwargs, result)
     return result
 
 

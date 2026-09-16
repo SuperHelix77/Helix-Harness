@@ -58,7 +58,10 @@ export function HelixEnginePage() {
           if (live) setEvents(body.events ?? []);
         })
         .catch(() => undefined);
-      void authFetch(`/api/helix-engine/session/${encodeURIComponent(sessionId)}`)
+      const traceQuery = threadId
+        ? `?thread_id=${encodeURIComponent(threadId)}`
+        : "";
+      void authFetch(`/api/helix-engine/session/${encodeURIComponent(sessionId)}${traceQuery}`)
         .then((response) => response.json())
         .then((body: { steps?: SessionStep[] }) => {
           if (live) setSteps(body.steps ?? []);
@@ -71,7 +74,7 @@ export function HelixEnginePage() {
       live = false;
       window.clearInterval(timer);
     };
-  }, [sessionId]);
+  }, [sessionId, threadId]);
 
   async function analyzeSession() {
     setError(null);
@@ -83,7 +86,9 @@ export function HelixEnginePage() {
         result: step.result,
         useful_hint: step.useful_hint,
       })),
-      verified: true,
+      // Manual inspection is not objective verification. The backend also
+      // enforces this distinction even if an old client sends verified=true.
+      verified: false,
       final_result: steps.at(-1)?.result ?? "",
     };
     const response = await authFetch("/api/helix-engine/analyze", {

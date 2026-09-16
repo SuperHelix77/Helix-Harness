@@ -4,16 +4,27 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  auditToLegacyCritic,
+  helixSelfAuditPrompt,
   helixSelfCriticPrompt,
   hermesLearningReviewPrompt,
+  isHelixSelfAuditRequest,
   isHelixSelfCriticRequest,
   isHermesLearningReviewRequest,
+  parseHelixSelfAudit,
   parseHelixSelfCritic,
   parseOnTheFlySkillDraft,
   parseHermesLearningProposal,
   stripOnTheFlySkillDraft,
   stripHermesLearningProposal,
 } from "../src/features/chat/lib/hermes-learning.ts";
+
+function auditArtifacts(prompt: string): Record<string, unknown> {
+  const marker = "Observable artifacts JSON: ";
+  const offset = prompt.lastIndexOf(marker);
+  assert.notEqual(offset, -1);
+  return JSON.parse(prompt.slice(offset + marker.length)) as Record<string, unknown>;
+}
 
 test("Hermes review prompt is detectable and uses the staged proposal protocol", () => {
   const prompt = hermesLearningReviewPrompt("the loader fix");
@@ -69,4 +80,61 @@ test("learning recommendations accept runtime repair without turning it into a s
   );
   assert.equal(proposal?.recommendationAction, "runtime-fix");
   assert.equal(proposal?.recommendationReason, "The active candidate failed.");
+});
+
+test("self-audit artifacts remain valid JSON under oversized telemetry", () => {
+  const telemetry: Record<string, unknown> = Object.fromEntries(
+    Array.from({ length: 120 }, (_, index) => [`noise_${index}`, "x".repeat(2_000)]),
+  );
+  telemetry.prompt_tokens = 1_234;
+  telemetry.cached_tokens = 800;
+  telemetry.accepted_drafts = 7;
+  const prompt = helixSelfAuditPrompt("oversized telemetry", {
+    objective: "inspect the run",
+    final_result: "done",
+    telemetry,
+    tool_steps: [],
+  });
+  assert.equal(isHelixSelfAuditRequest(prompt), true);
+  const artifacts = auditArtifacts(prompt);
+  assert.equal((artifacts.telemetry as Record<string, unknown>).prompt_tokens, 1_234);
+  assert.equal((artifacts.telemetry as Record<string, unknown>).cached_tokens, 800);
+  assert.match(String((artifacts.telemetry as Record<string, unknown>).helix_artifact_compaction), /summary|structured/);
+});
+
+test("self-audit tool slicing preserves backend evidence indexes", () => {
+  const toolSteps = Array.from({ length: 20 }, (_, index) => ({
+    index,
+    evidence_ids: [`tool:${index}:result`],
+    name: "read_file",
+    arguments: `file-${index}`,
+    result: `result-${index}`,
+  }));
+  const artifacts = auditArtifacts(helixSelfAuditPrompt("index preservation", {
+    objective: "inspect files",
+    final_result: "done",
+    telemetry: {},
+    tool_steps: toolSteps,
+  }));
+  const tools = artifacts.tool_steps as Array<Record<string, unknown>>;
+  assert.equal(tools.length, 16);
+  assert.equal(tools[0]?.index, 4);
+  assert.deepEqual(tools[0]?.evidence_ids, ["tool:4:result"]);
+  assert.equal(tools.at(-1)?.index, 19);
+  assert.deepEqual(tools.at(-1)?.evidence_ids, ["tool:19:result"]);
+});
+
+test("self-audit parser keeps only evidence-reference grammar the backend can resolve", () => {
+  const audit = parseHelixSelfAudit(
+    '<helix-self-audit>{"objective":"x","achieved":true,"recommendation":"IGNORE","claims":[{"claim":"checked","evidence_refs":["tool:19:verification","benchmark:speed","tool:abc:result","tool:0:../../","made-up"]}]}</helix-self-audit>',
+  );
+  assert.deepEqual(audit?.claims[0]?.evidence_refs, ["tool:19:verification", "benchmark:speed"]);
+});
+
+test("self-audit QLoRA recommendation cannot re-enter the legacy critic path", () => {
+  const audit = parseHelixSelfAudit(
+    '<helix-self-audit>{"objective":"x","achieved":true,"recommendation":"QLORA_CANDIDATE","recommendation_reason":"model request"}</helix-self-audit>',
+  );
+  assert.ok(audit);
+  assert.equal(auditToLegacyCritic(audit).recommendation, "none");
 });

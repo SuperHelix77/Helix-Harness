@@ -204,6 +204,15 @@ def _summed_tool_loop_stats(total, turn):
             (predicted_n / (predicted_ms / 1000.0)) if predicted_ms else 0.0
         )
         summed["timings"] = timings
+    turn_spec = turn.get("speculative") if isinstance(turn.get("speculative"), dict) else None
+    prior_spec = total.get("speculative") if isinstance(total.get("speculative"), dict) else None
+    if turn_spec or prior_spec:
+        spec = dict(prior_spec or {})
+        spec.update({key: value for key, value in (turn_spec or {}).items() if key not in {"draft_tokens", "accepted_tokens", "steps", "used"}})
+        for field in ("draft_tokens", "accepted_tokens", "steps"):
+            spec[field] = int((prior_spec or {}).get(field) or 0) + int((turn_spec or {}).get(field) or 0)
+        spec["used"] = bool((prior_spec or {}).get("used") or (turn_spec or {}).get("used"))
+        summed["speculative"] = spec
     return summed
 
 
@@ -2231,6 +2240,7 @@ class InferenceOrchestrator:
         stop: Optional[list] = None,
         reasoning_prefilled: bool = False,
         seed: Optional[int] = None,
+        helix_turn_id: Optional[str] = None,
         **_unused,
     ):
         """Run the safetensors agentic tool loop in the parent process, calling the worker for each
@@ -2360,6 +2370,7 @@ class InferenceOrchestrator:
             context_length = _model_info.get("context_length"),
             max_tokens = max_new_tokens,
             generation_stats_holder = turn_stats,
+            helix_turn_id = helix_turn_id,
         )
 
     def generate_with_adapter_control(

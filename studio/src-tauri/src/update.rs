@@ -5,7 +5,7 @@ use process_wrap::std::*;
 use std::io::BufRead;
 use std::process::{Command, ExitStatus, Stdio};
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 
 #[derive(Default)]
@@ -79,6 +79,68 @@ fn configure_tauri_update_environment(cmd: &mut Command) {
 // inherit the gate rather than take it again. Set everywhere, as Windows always did.
 fn configure_runtime_gate_environment(cmd: &mut Command) {
     cmd.env(crate::process::STUDIO_RUNTIME_GATE_HANDOFF_ENV, "1");
+}
+
+#[cfg(target_os = "macos")]
+fn apply_bundled_helix_backend_overlay(
+    app: &AppHandle,
+    bin: &std::path::Path,
+) -> Result<(), String> {
+    let resource_dir = app
+        .path()
+        .resource_dir()
+        .map_err(|error| format!("Helix backend resource directory unavailable: {error}"))?;
+    let overlay = resource_dir.join("helix-backend");
+    let applier = resource_dir.join("apply_helix_backend_overlay.py");
+    if !overlay.is_dir() || !applier.is_file() {
+        return Err(format!(
+            "Helix backend overlay resources are missing: {} / {}",
+            overlay.display(),
+            applier.display()
+        ));
+    }
+
+    let scripts_dir = bin
+        .parent()
+        .ok_or_else(|| "Managed Unsloth binary has no parent directory".to_string())?;
+    let python = scripts_dir.join("python");
+    if !python.is_file() {
+        return Err(format!("Managed Python is missing: {}", python.display()));
+    }
+
+    let mut cmd = Command::new(&python);
+    cmd.arg(&applier).arg(&overlay);
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+    crate::process::apply_managed_cli_context(&mut cmd).map_err(|error| {
+        format!("Could not prepare managed context for Helix backend overlay: {error}")
+    })?;
+    cmd.env_remove("PYTHONHOME");
+    cmd.env_remove("PYTHONPATH");
+    cmd.env_remove("UNSLOTH_STUDIO_HOME");
+    cmd.env_remove("STUDIO_HOME");
+
+    let output = cmd
+        .output()
+        .map_err(|error| format!("Could not run Helix backend overlay: {error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "Helix backend overlay failed after update: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    info!(
+        "[update] Reapplied bundled Helix backend contract after managed update: {}",
+        String::from_utf8_lossy(&output.stdout).trim()
+    );
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn apply_bundled_helix_backend_overlay(
+    _app: &AppHandle,
+    _bin: &std::path::Path,
+) -> Result<(), String> {
+    Ok(())
 }
 
 fn spawn_update(
@@ -344,6 +406,21 @@ fn run_update(
 
     match result {
         Ok((status, _)) if status.success() => {
+            if let Err(msg) = apply_bundled_helix_backend_overlay(&app, &bin) {
+                diagnostics::finish_attempt(
+                    &diagnostics,
+                    &attempt,
+                    Some(status.to_string()),
+                    false,
+                    Some(msg.clone()),
+                );
+                clear_current_attempt(&state);
+                error!("[update] {}", msg);
+                if let Some((_, failed)) = kind.terminal_events() {
+                    let _ = app.emit(failed, &msg);
+                }
+                return Err(msg);
+            }
             diagnostics::finish_attempt(
                 &diagnostics,
                 &attempt,
