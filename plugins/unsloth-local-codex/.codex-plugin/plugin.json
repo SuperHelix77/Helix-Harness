@@ -1,0 +1,21 @@
+{
+  "name": "unsloth-local-codex",
+  "version": "0.1.0",
+  "description": "Local Codex workflow for Unsloth Studio with durable plans, goals, long-context Mac inference, and GitHub context.",
+  "author": { "name": "Unsloth Studio" },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Unsloth Local Codex",
+    "shortDescription": "Local Codex workflow for Unsloth Studio.",
+    "longDescription": "Adds a reusable local workflow for Unsloth Studio: inspect GitHub ledgers, plan changes, execute durable goals, and validate Mac inference without embedding credentials.",
+    "developerName": "Unsloth Studio",
+    "category": "Productivity",
+    "capabilities": ["GitHub context", "Plan mode", "Goal mode", "Slash commands", "Mac inference"],
+    "defaultPrompt": [
+      "Inspect the Unsloth v1.1 ledger and propose safe optimizations.",
+      "Plan a Mac inference change and keep explicit user settings authoritative.",
+      "Audit a DFlash or MTP change against GitHub evidence."
+    ]
+  },
+  "mcpServers": "./.mcp.json"
+}

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 248 88" role="img" aria-labelledby="title">
+  <title id="title">Helix</title>
+  <g fill="none" stroke="#232b2f" stroke-width="5.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 12c6.2 9.2-6.2 18.4 0 27.6 6.2 9.2-6.2 18.4 0 26.8"/>
+    <path d="M48 12c-6.2 9.2 6.2 18.4 0 27.6-6.2 9.2 6.2 18.4 0 26.8"/>
+    <path d="M19.4 38.8h27.2"/>
+    <path d="M22.6 30.2c7 3.4 14 3.4 21 0"/>
+    <path d="M22.6 50.2c7-3.4 14-3.4 21 0"/>
+  </g>
+  <text x="64" y="59" fill="#232b2f" font-family="Arial, Helvetica, sans-serif" font-size="44" font-weight="800" letter-spacing="3">ELIX</text>
+</svg>

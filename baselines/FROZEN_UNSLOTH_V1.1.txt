@@ -1,0 +1,5 @@
+Frozen Unsloth v1.1 baseline
+path: /Users/mert/llmspeed-work/unsloth-studio-v1.1
+ledger: /Users/mert/llmspeed-work/q38-v1.1-ledger/docs/UNSLOTH_STUDIO_V1_1_OPTIMIZATION_LEDGER.md
+handoff: docs/UNSLOTH_STUDIO_V1_1_HELIX_HANDOFF_LEDGER_2026-09-16.md
+measured: Qwen3.8-27B-UD-Q4_K_XL ~13 tok/s speculation-off on M3 Max 36GB
