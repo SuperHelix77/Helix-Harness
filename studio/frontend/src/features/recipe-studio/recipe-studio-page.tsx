@@ -795,8 +795,8 @@ export function RecipeStudioPage({
     <div
       className={
         maximized
-          ? "fixed inset-x-0 bottom-0 z-50 flex flex-col bg-background"
-          : "flex h-full min-h-0 flex-1 flex-col bg-background"
+          ? "fixed inset-x-0 bottom-0 z-50 flex flex-col app-main-background"
+          : "flex h-full min-h-0 flex-1 flex-col app-main-background"
       }
       style={
         maximized

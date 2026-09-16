@@ -50,16 +50,14 @@ def tiff_first_image_size(path: Path) -> tuple[int, int]:
     return sizes[256], sizes[257]
 
 
-def test_desktop_display_name_and_compatibility_ids() -> None:
+def test_desktop_v2_display_identity_and_runtime_compatibility() -> None:
     config = json.loads(read(TAURI / "tauri.conf.json"))
-    assert config["productName"] == "Unsloth"
-    assert config["app"]["windows"][0]["title"] == "Unsloth"
+    assert config["productName"] == "Helix Harness"
+    assert config["app"]["windows"][0]["title"] == "Helix Harness"
 
-    assert config["identifier"] == "ai.unsloth.studio"
-    assert config["plugins"]["deep-link"]["desktop"]["schemes"] == ["unsloth"]
-    assert config["plugins"]["updater"]["endpoints"] == [
-        "https://github.com/unslothai/unsloth/releases/latest/download/latest.json"
-    ]
+    assert config["identifier"] == "ai.helix.harness"
+    assert config["plugins"]["deep-link"]["desktop"]["schemes"] == ["helixharness"]
+    assert config["plugins"]["updater"]["endpoints"] == []
     assert 'name = "unsloth-studio"' in read(TAURI / "Cargo.toml")
 
 
@@ -83,7 +81,7 @@ def test_desktop_package_transitions_preserve_legacy_installs() -> None:
     assert 'Rename "$DESKTOP\\${INSTALLIDENTITY}.lnk"' in installer
 
 
-def test_desktop_artwork_uses_plain_unsloth_lockups() -> None:
+def test_desktop_artwork_uses_helix_branding() -> None:
     config = json.loads(read(TAURI / "tauri.conf.json"))
     nsis = config["bundle"]["windows"]["nsis"]
     assert nsis["headerImage"] == "./windows/branding/nsis-header.bmp"
@@ -91,14 +89,14 @@ def test_desktop_artwork_uses_plain_unsloth_lockups() -> None:
 
     for component in ("startup-screen.tsx", "update-screen.tsx"):
         source = read(FRONTEND / "src/components/tauri" / component)
-        assert "/sticker.png" in source
-        assert "fontFamily: '\"Hellix\", sans-serif'" in source
-        assert "unsloth" in source
-        assert "/studio.png" not in source
+        assert "/helix-mark.svg" in source
+        assert "helix-logo" in source
+        assert "HELIX HARNESS" in source
+        assert "/sticker.png" not in source
 
     sidebar = read(FRONTEND / "src/components/app-sidebar.tsx")
-    assert "/circle-logo-small.png" in sidebar
-    assert "unsloth" in sidebar
+    assert 'aria-label="Helix Harness home"' in sidebar
+    assert "HELIX HARNESS" in sidebar
 
     assert 'chatDisabled && "pointer-events-none opacity-50"' not in sidebar
     assert not (FRONTEND / "public/studio.png").exists()
@@ -249,7 +247,7 @@ def locale_entries(text: str) -> list[tuple[str, str]]:
 
 
 def test_desktop_surfaces_do_not_restore_studio_branding() -> None:
-    # The desktop app displays itself as "Unsloth", never "Unsloth Studio". The i18n catalogs are swept by key rather
+    # The desktop app displays itself as "Helix Harness", never "Unsloth Studio". The i18n catalogs are swept by key rather
     # than by file: a handful of entries have to name the *remote server* a user points the app at, which genuinely is
     # an Unsloth Studio and is not this app's display name, so those keys are spared and every other entry is not.
     display_sources = [

@@ -14,7 +14,7 @@ function DashboardLayout({
     <div
       data-slot="dashboard-layout"
       className={cn(
-        "min-h-screen w-full bg-background",
+        "min-h-screen w-full app-main-background",
         "flex justify-center",
         className,
       )}

@@ -26,16 +26,16 @@ function Logo() {
   return (
     <div className="flex items-center justify-center gap-3">
       <img
-        src="/sticker.png"
+        src="/helix-mark.svg"
         alt=""
         aria-hidden="true"
-        className="h-[60px] w-[60px] object-contain"
+        className="helix-logo h-[60px] w-[60px] object-contain"
       />
       <span
-        className="text-ui-50 font-semibold leading-none tracking-[-0.02em] text-foreground"
+        className="helix-wordmark text-ui-36 font-semibold leading-none tracking-[0.06em] text-foreground"
         style={{ fontFamily: '"Hellix", sans-serif' }}
       >
-        unsloth
+        HELIX HARNESS
       </span>
     </div>
   );

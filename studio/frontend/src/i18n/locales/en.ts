@@ -1023,6 +1023,7 @@ export const en = {
         classic: "Classic",
         minimal: "Minimal",
         glass: "Violet glass",
+        mainTransparency: "Main background transparency",
         opacity: "Glass opacity",
         opacityDescription: "How solid frosted surfaces are. Lower is more see-through.",
         blur: "Glass blur",

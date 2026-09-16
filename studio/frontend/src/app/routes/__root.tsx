@@ -227,6 +227,8 @@ const CHAT_ONLY_ALLOWED = new Set([
   "/chat",
   "/projects",
   "/hub",
+  // Helix Engine observes chat trajectories and works on the same chat-only hosts as chat itself.
+  "/engine",
   "/login",
   "/signup",
   "/change-password",
@@ -287,7 +289,7 @@ export const Route = createRootRoute({
 const HIDDEN_NAVBAR_ROUTES = ["/login", "/change-password"];
 
 // Fallback when no matched route declares a `staticData.title`.
-const DEFAULT_DOCUMENT_TITLE = "Unsloth";
+const DEFAULT_DOCUMENT_TITLE = "Helix Harness";
 
 function RootLayout() {
   const t = useT();

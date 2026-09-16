@@ -832,7 +832,7 @@ function CompareShell({
         >
           {children}
         </div>
-        <div className="shrink-0 bg-background pl-5 pr-5 md:pr-[30px] pb-2 pt-1">
+        <div className="shrink-0 app-main-background pl-5 pr-5 md:pr-[30px] pb-2 pt-1">
           <div className="mx-auto w-full max-w-[48rem]">{composer}</div>
           {showModelDisclaimer && (
             <p className="composer-footer-note">
@@ -1027,7 +1027,7 @@ function GeneralCompareHeader({
   return (
     <div
       className={cn(
-        "pointer-events-none relative z-40 flex h-[48px] shrink-0 items-start gap-2 bg-background pt-[var(--studio-chat-header-padding-top,11px)]",
+        "pointer-events-none relative z-40 flex h-[48px] shrink-0 items-start gap-2 app-main-background pt-[var(--studio-chat-header-padding-top,11px)]",
         side === "left"
           ? pinned
             ? "pl-12 pr-3 md:pl-2"
@@ -3928,7 +3928,7 @@ export function ChatPage({
     // Provides `active` to ChatRuntimeProvider (drops the message views while off-route, keeping the
     // runtime alive) and to the compare chrome.
     <ChatActiveContext.Provider value={active}>
-    <div className="flex min-h-0 min-w-0 flex-1 basis-0 overflow-hidden bg-background">
+    <div className="flex min-h-0 min-w-0 flex-1 basis-0 overflow-hidden app-main-background">
       {/* Portaled surfaces render to document.body, escaping the parent's hidden wrapper, so gate them
           on `active` to keep them off other tabs. */}
       {active && <GuidedTour {...tour.tourProps} />}
@@ -3958,7 +3958,7 @@ export function ChatPage({
         )}
         <div
           className={cn(
-            "pointer-events-none absolute top-[var(--studio-content-top-inset,0px)] left-0 right-[10px] z-40 flex h-[var(--studio-chat-header-height,48px)] shrink-0 items-start bg-background pt-[var(--studio-chat-header-padding-top,11px)] pr-[calc(0.5rem+var(--studio-chat-header-right-inset,var(--studio-window-control-inset,0px)))]",
+            "pointer-events-none absolute top-[var(--studio-content-top-inset,0px)] left-0 right-[10px] z-40 flex h-[var(--studio-chat-header-height,48px)] shrink-0 items-start app-main-background pt-[var(--studio-chat-header-padding-top,11px)] pr-[calc(0.5rem+var(--studio-chat-header-right-inset,var(--studio-window-control-inset,0px)))]",
             isMobile
               ? "pl-12"
               : pinned

@@ -21,6 +21,10 @@ import { readSrcAsync } from "./helpers/kit.ts";
 
 const src = await readSrcAsync("app/routes/__root.tsx");
 
+test("the shell title uses Helix Harness branding", () => {
+  assert.match(src, /const DEFAULT_DOCUMENT_TITLE = "Helix Harness";/);
+});
+
 function lift(pattern: RegExp, what: string): string {
   const found = pattern.exec(src);
   assert.ok(found, `could not find ${what} in __root.tsx`);
@@ -95,7 +99,14 @@ test("an unmeasured verdict still lets both pages wait it out", () => {
 
 test("the pages that self-gate are unaffected, and everything else still redirects", () => {
   // Allowed for the same reason /video now is: each explains itself instead of vanishing.
-  for (const path of ["/chat", "/export", "/images", "/api-monitor", "/data-recipes"]) {
+  for (const path of [
+    "/chat",
+    "/engine",
+    "/export",
+    "/images",
+    "/api-monitor",
+    "/data-recipes",
+  ]) {
     assert.equal(measuredChatOnly(path), false, `${path} no longer survives the guard`);
   }
   // Nothing was widened past the paths that opt in.

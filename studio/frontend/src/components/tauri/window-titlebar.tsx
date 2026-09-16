@@ -370,7 +370,7 @@ export function WindowTitlebar({
           />
           {pinned && (
             <div
-              className="absolute top-0 size-3 -translate-x-px rounded-tl-[12px] border-l border-t border-sidebar-border bg-background"
+              className="absolute top-0 size-3 -translate-x-px rounded-tl-[12px] border-l border-t border-sidebar-border app-main-background"
               style={{ left: sidebarWidth }}
             />
           )}

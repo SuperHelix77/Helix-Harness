@@ -49,6 +49,7 @@ import {
 import {
   GLASS_BLUR_RANGE,
   GLASS_OPACITY_RANGE,
+  MAIN_BACKGROUND_TRANSPARENCY_RANGE,
   type Palette,
   type ResolvedTheme,
   useGlass,
@@ -875,6 +876,24 @@ export function GlassControls() {
   if (palette !== "glass") return null;
   return (
     <div className="flex flex-col gap-3">
+      <div className="flex w-full items-center gap-3">
+        <span className="w-28 shrink-0 text-xs text-muted-foreground">
+          {t("settings.appearance.palette.mainTransparency")}
+        </span>
+        <Slider
+          value={[glass.mainBackgroundTransparency]}
+          min={MAIN_BACKGROUND_TRANSPARENCY_RANGE.min}
+          max={MAIN_BACKGROUND_TRANSPARENCY_RANGE.max}
+          step={2}
+          onValueChange={(values: number[]) =>
+            glass.setMainBackgroundTransparency(values[0])
+          }
+          aria-label={t("settings.appearance.palette.mainTransparency")}
+        />
+        <span className="w-8 text-right text-xs tabular-nums text-muted-foreground">
+          {glass.mainBackgroundTransparency}
+        </span>
+      </div>
       <div className="flex w-full items-center gap-3">
         <span className="w-28 shrink-0 text-xs text-muted-foreground">
           {t("settings.appearance.palette.opacity")}

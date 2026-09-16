@@ -13,6 +13,7 @@ const STORAGE_KEY = "theme";
 const PALETTE_STORAGE_KEY = "helix-palette";
 const GLASS_OPACITY_KEY = "helix-glass-opacity";
 const GLASS_BLUR_KEY = "helix-glass-blur";
+const MAIN_BACKGROUND_TRANSPARENCY_KEY = "helix-main-background-transparency";
 
 export const PALETTES: readonly Palette[] = [
   "standard",
@@ -23,6 +24,11 @@ export const PALETTES: readonly Palette[] = [
 
 export const GLASS_OPACITY_RANGE = { min: 8, max: 88, default: 36 } as const;
 export const GLASS_BLUR_RANGE = { min: 0, max: 48, default: 28 } as const;
+export const MAIN_BACKGROUND_TRANSPARENCY_RANGE = {
+  min: 0,
+  max: 100,
+  default: 0,
+} as const;
 
 export function isPalette(value: unknown): value is Palette {
   return (
@@ -107,6 +113,13 @@ let currentGlassBlur = readStoredNumber(
   GLASS_BLUR_RANGE.max,
 );
 
+let currentMainBackgroundTransparency = readStoredNumber(
+  MAIN_BACKGROUND_TRANSPARENCY_KEY,
+  MAIN_BACKGROUND_TRANSPARENCY_RANGE.default,
+  MAIN_BACKGROUND_TRANSPARENCY_RANGE.min,
+  MAIN_BACKGROUND_TRANSPARENCY_RANGE.max,
+);
+
 function systemPrefersDark(): boolean {
   if (typeof window === "undefined") return false;
   return window.matchMedia("(prefers-color-scheme: dark)").matches;
@@ -138,6 +151,7 @@ function applyPaletteToDocument(palette: Palette) {
   }
   el.toggleAttribute("data-glass", palette === "glass");
   applyGlassToDocument();
+  applyMainBackgroundToDocument();
   queueMicrotask(() => syncInkContrast());
 }
 
@@ -146,6 +160,14 @@ function applyGlassToDocument() {
   const el = document.documentElement;
   el.style.setProperty("--glass-alpha", `${currentGlassOpacity}%`);
   el.style.setProperty("--glass-blur", `${currentGlassBlur}px`);
+}
+
+function applyMainBackgroundToDocument() {
+  if (typeof document === "undefined") return;
+  document.documentElement.style.setProperty(
+    "--main-background-alpha",
+    `${100 - currentMainBackgroundTransparency}%`,
+  );
 }
 
 const listeners = new Set<() => void>();
@@ -166,6 +188,9 @@ function subscribe(cb: () => void) {
     if (
       e.key === STORAGE_KEY ||
       e.key === PALETTE_STORAGE_KEY ||
+      e.key === GLASS_OPACITY_KEY ||
+      e.key === GLASS_BLUR_KEY ||
+      e.key === MAIN_BACKGROUND_TRANSPARENCY_KEY ||
       e.key === null
     ) {
       currentTheme = readStoredTheme();
@@ -181,6 +206,12 @@ function subscribe(cb: () => void) {
         GLASS_BLUR_RANGE.default,
         GLASS_BLUR_RANGE.min,
         GLASS_BLUR_RANGE.max,
+      );
+      currentMainBackgroundTransparency = readStoredNumber(
+        MAIN_BACKGROUND_TRANSPARENCY_KEY,
+        MAIN_BACKGROUND_TRANSPARENCY_RANGE.default,
+        MAIN_BACKGROUND_TRANSPARENCY_RANGE.min,
+        MAIN_BACKGROUND_TRANSPARENCY_RANGE.max,
       );
       applyToDocument(resolveTheme(currentTheme));
       applyPaletteToDocument(currentPalette);
@@ -318,11 +349,27 @@ export function setGlassBlur(next: number): void {
   listeners.forEach((cb) => cb());
 }
 
+export function setMainBackgroundTransparency(next: number): void {
+  if (typeof window === "undefined") return;
+  currentMainBackgroundTransparency = Math.min(
+    MAIN_BACKGROUND_TRANSPARENCY_RANGE.max,
+    Math.max(MAIN_BACKGROUND_TRANSPARENCY_RANGE.min, Math.round(next)),
+  );
+  persistNumber(
+    MAIN_BACKGROUND_TRANSPARENCY_KEY,
+    currentMainBackgroundTransparency,
+  );
+  applyMainBackgroundToDocument();
+  listeners.forEach((cb) => cb());
+}
+
 export function useGlass(): {
   opacity: number;
   blur: number;
+  mainBackgroundTransparency: number;
   setOpacity: (next: number) => void;
   setBlur: (next: number) => void;
+  setMainBackgroundTransparency: (next: number) => void;
 } {
   const opacity = useSyncExternalStore(
     subscribe,
@@ -334,10 +381,17 @@ export function useGlass(): {
     () => currentGlassBlur,
     () => GLASS_BLUR_RANGE.default,
   );
+  const mainBackgroundTransparency = useSyncExternalStore(
+    subscribe,
+    () => currentMainBackgroundTransparency,
+    () => MAIN_BACKGROUND_TRANSPARENCY_RANGE.default,
+  );
   return {
     opacity,
     blur,
+    mainBackgroundTransparency,
     setOpacity: setGlassOpacity,
     setBlur: setGlassBlur,
+    setMainBackgroundTransparency,
   };
 }

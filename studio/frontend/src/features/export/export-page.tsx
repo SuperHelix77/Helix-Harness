@@ -902,7 +902,7 @@ export function ExportPage() {
   }, [showPanel]);
 
   return (
-    <div className="min-h-[calc(100dvh-var(--studio-titlebar-height,0px))] bg-background">
+    <div className="min-h-[calc(100dvh-var(--studio-titlebar-height,0px))] app-main-background">
       <main className="mx-auto max-w-7xl px-5 py-8 sm:px-9">
         <GuidedTour {...tour.tourProps} />
 

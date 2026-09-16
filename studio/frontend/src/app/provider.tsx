@@ -883,8 +883,8 @@ function TauriWrapper({ children }: { children: ReactNode }) {
         <div
           className={
             hidesTitlebarSidebar
-              ? "relative h-dvh min-h-0 overflow-x-hidden overflow-y-auto bg-background"
-              : "relative h-dvh min-h-0 overflow-hidden bg-background"
+              ? "relative h-dvh min-h-0 overflow-x-hidden overflow-y-auto app-main-background"
+              : "relative h-dvh min-h-0 overflow-hidden app-main-background"
           }
           style={
             nativeMacControlsHidden
@@ -920,7 +920,7 @@ function TauriWrapper({ children }: { children: ReactNode }) {
 
   return (
     <div
-      className="relative h-dvh min-h-0 overflow-hidden bg-background"
+      className="relative h-dvh min-h-0 overflow-hidden app-main-background"
       style={CUSTOM_CHROME_STYLE}
     >
       {chromeVars}

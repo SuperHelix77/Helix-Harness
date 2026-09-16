@@ -1,24 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { useEffect, useState } from "react";
 
-import { sandboxSessionIdFor } from "@/components/assistant-ui/sandbox-files";
 import { authFetch } from "@/features/auth";
-import { useChatRuntimeStore } from "@/features/chat/stores/chat-runtime-store";
+import { getStoredChatThreadReadResult, useChatRuntimeStore } from "@/features/chat";
 
-type FeedEvent = {
-  action?: string;
-  url?: string;
-  kind?: string;
-  title?: string;
-  snippet?: string;
-};
-
-type SessionStep = {
-  name: string;
-  arguments: string;
-  result: string;
-  useful_hint: string;
-};
+import {
+  engineProjectIdForThread,
+  engineSessionIdFor,
+  fetchHelixJson,
+  helixErrorMessage,
+  loadHelixSnapshot,
+  type FeedEvent,
+  type SessionStep,
+} from "./engine-data";
 
 type AnalyzeResult = {
   gates?: string[];
@@ -30,19 +24,54 @@ type AnalyzeResult = {
   corrections?: Array<{ bad_action?: string; correct_action?: string; why?: string }>;
 };
 
+type SessionBinding = {
+  threadId: string;
+  sessionId: string;
+  scope: string;
+  warning: string | null;
+};
+
+type PollState = {
+  key: string;
+  events: FeedEvent[];
+  steps: SessionStep[];
+  status: "connected" | "degraded";
+  error: string | null;
+  lastUpdatedAt: number | null;
+};
+
+type AnalysisState = {
+  key: string;
+  value: AnalyzeResult;
+};
+
 export function HelixEnginePage() {
   const threadId = useChatRuntimeStore((state) => state.activeThreadId);
-  const projectId = useChatRuntimeStore((state) => state.activeProjectId);
-  const sessionId =
-    sandboxSessionIdFor(threadId ?? undefined, projectId) ?? threadId ?? "default";
-  const [events, setEvents] = useState<FeedEvent[]>([]);
-  const [steps, setSteps] = useState<SessionStep[]>([]);
+  const activeProjectId = useChatRuntimeStore((state) => state.activeProjectId);
+  const fallbackSessionId = engineSessionIdFor(threadId, activeProjectId);
+  const [sessionBinding, setSessionBinding] = useState<SessionBinding | null>(null);
+  const resolvedBinding =
+    threadId && sessionBinding?.threadId === threadId ? sessionBinding : null;
+  const sessionId = resolvedBinding?.sessionId ?? fallbackSessionId;
+  const sessionScope = !threadId
+    ? "No active chat selected"
+    : resolvedBinding?.scope ?? "Resolving saved chat scope…";
+  const sessionWarning = resolvedBinding?.warning ?? null;
+  const pollKey = JSON.stringify([threadId ?? "", sessionId]);
+  const [pollState, setPollState] = useState<PollState | null>(null);
+  const currentPoll = pollState?.key === pollKey ? pollState : null;
+  const events = currentPoll?.events ?? [];
+  const steps = currentPoll?.steps ?? [];
+  const pollStatus = currentPoll?.status ?? "connecting";
+  const pollError = currentPoll?.error ?? null;
+  const lastUpdatedAt = currentPoll?.lastUpdatedAt ?? null;
   const [turns, setTurns] = useState("");
   const [turnSignal, setTurnSignal] = useState<{
     unnecessary_turns?: number;
     feed_self_improvement?: boolean;
   } | null>(null);
-  const [analysis, setAnalysis] = useState<AnalyzeResult | null>(null);
+  const [analysisState, setAnalysisState] = useState<AnalysisState | null>(null);
+  const analysis = analysisState?.key === pollKey ? analysisState.value : null;
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -50,31 +79,69 @@ export function HelixEnginePage() {
   }, []);
 
   useEffect(() => {
+    if (!threadId) return;
     let live = true;
-    const load = () => {
-      void authFetch(`/api/helix-engine/live-feed?session_id=${encodeURIComponent(sessionId)}`)
-        .then((response) => response.json())
-        .then((body: { events?: FeedEvent[] }) => {
-          if (live) setEvents(body.events ?? []);
-        })
-        .catch(() => undefined);
-      const traceQuery = threadId
-        ? `?thread_id=${encodeURIComponent(threadId)}`
-        : "";
-      void authFetch(`/api/helix-engine/session/${encodeURIComponent(sessionId)}${traceQuery}`)
-        .then((response) => response.json())
-        .then((body: { steps?: SessionStep[] }) => {
-          if (live) setSteps(body.steps ?? []);
-        })
-        .catch(() => undefined);
-    };
-    load();
-    const timer = window.setInterval(load, 1_000);
+    const controller = new AbortController();
+    void getStoredChatThreadReadResult(threadId, {
+      bounded: true,
+      timeoutMs: 2_500,
+      signal: controller.signal,
+    })
+      .then(({ thread }) => {
+        if (!live) return;
+        const projectId = engineProjectIdForThread(thread, activeProjectId);
+        setSessionBinding({
+          threadId,
+          sessionId: engineSessionIdFor(threadId, projectId),
+          scope: projectId
+            ? `Project workspace · thread ${threadId}`
+            : `Thread workspace · ${threadId}`,
+          warning: null,
+        });
+      })
+      .catch((cause: unknown) => {
+        if (!live || controller.signal.aborted) return;
+        setSessionBinding({
+          threadId,
+          sessionId: fallbackSessionId,
+          scope: activeProjectId
+            ? `Project workspace · thread ${threadId}`
+            : `Thread workspace · ${threadId}`,
+          warning: `Saved chat scope could not be verified (${helixErrorMessage(cause)}). Using the current app scope.`,
+        });
+      });
     return () => {
       live = false;
-      window.clearInterval(timer);
+      controller.abort();
     };
-  }, [sessionId, threadId]);
+  }, [threadId, activeProjectId, fallbackSessionId]);
+
+  useEffect(() => {
+    let live = true;
+    let timer: number | null = null;
+    const load = async () => {
+      const snapshot = await loadHelixSnapshot(authFetch, sessionId, threadId);
+      if (!live) return;
+      setPollState((previous) => {
+        const prior = previous?.key === pollKey ? previous : null;
+        return {
+          key: pollKey,
+          events: snapshot.events ?? prior?.events ?? [],
+          steps: snapshot.steps ?? prior?.steps ?? [],
+          status: snapshot.errors.length ? "degraded" : "connected",
+          error: snapshot.errors.length ? snapshot.errors.join(" · ") : null,
+          lastUpdatedAt:
+            snapshot.successfulRequests > 0 ? Date.now() : (prior?.lastUpdatedAt ?? null),
+        };
+      });
+      if (live) timer = window.setTimeout(() => void load(), 1_000);
+    };
+    void load();
+    return () => {
+      live = false;
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, [pollKey, sessionId, threadId]);
 
   async function analyzeSession() {
     setError(null);
@@ -91,41 +158,43 @@ export function HelixEnginePage() {
       verified: false,
       final_result: steps.at(-1)?.result ?? "",
     };
-    const response = await authFetch("/api/helix-engine/analyze", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const body = (await response.json()) as AnalyzeResult & { detail?: string };
-    if (!response.ok) {
-      setError(body.detail ?? "Analyze failed");
-      return;
+    try {
+      const body = await fetchHelixJson<AnalyzeResult>(
+        authFetch,
+        "/api/helix-engine/analyze",
+        "Analyze",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
+      setAnalysisState({ key: pollKey, value: body });
+    } catch (cause) {
+      setError(helixErrorMessage(cause));
     }
-    setAnalysis(body);
   }
 
   async function checkTurns() {
     setError(null);
-    const response = await authFetch("/api/helix-engine/semantic-turns", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        turns: turns
-          .split("\n")
-          .map((line) => line.trim())
-          .filter(Boolean),
-      }),
-    });
-    const body = (await response.json()) as {
-      unnecessary_turns?: number;
-      feed_self_improvement?: boolean;
-      detail?: string;
-    };
-    if (!response.ok) {
-      setError(body.detail ?? "Semantic-turn check failed");
-      return;
+    try {
+      const body = await fetchHelixJson<{
+        unnecessary_turns?: number;
+        feed_self_improvement?: boolean;
+      }>(authFetch, "/api/helix-engine/semantic-turns", "Semantic-turn check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          turns: turns
+            .split("\n")
+            .map((line) => line.trim())
+            .filter(Boolean),
+        }),
+      });
+      setTurnSignal(body);
+    } catch (cause) {
+      setError(helixErrorMessage(cause));
     }
-    setTurnSignal(body);
   }
 
   return (
@@ -139,7 +208,57 @@ export function HelixEnginePage() {
         <p className="mt-1 text-xs text-muted-foreground">Session {sessionId}</p>
       </header>
 
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      <section className="rounded-xl border border-border p-4" data-testid="helix-engine-status">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold">Engine status</h2>
+          <span className="text-xs text-muted-foreground" aria-live="polite">
+            {pollStatus === "connecting"
+              ? "Connecting"
+              : pollStatus === "degraded"
+                ? "Retrying"
+                : "Connected"}
+          </span>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">{sessionScope}</p>
+        {!threadId ? (
+          <p className="mt-2 text-sm">
+            Helix Engine is ready. Select a chat and complete a turn; this page will follow that
+            conversation automatically.
+          </p>
+        ) : pollStatus === "connected" && events.length === 0 && steps.length === 0 ? (
+          <p className="mt-2 text-sm">
+            Connected and idle. Tool activity and the latest completed trajectory will appear here
+            as the selected chat runs.
+          </p>
+        ) : (
+          <p className="mt-2 text-sm">
+            Tracking {events.length} live event{events.length === 1 ? "" : "s"} and {steps.length}{" "}
+            trajectory step{steps.length === 1 ? "" : "s"}.
+          </p>
+        )}
+        {lastUpdatedAt ? (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Last refresh {new Date(lastUpdatedAt).toLocaleTimeString()}
+          </p>
+        ) : null}
+        {sessionWarning ? (
+          <p className="mt-2 text-xs text-muted-foreground" role="status">
+            {sessionWarning}
+          </p>
+        ) : null}
+        {pollError ? (
+          <p className="mt-2 text-xs text-destructive" role="alert">
+            Telemetry refresh issue: {pollError}. Retrying automatically; already loaded data stays
+            visible.
+          </p>
+        ) : null}
+      </section>
+
+      {error ? (
+        <p className="text-sm text-destructive" role="alert">
+          {error}
+        </p>
+      ) : null}
 
       <section className="rounded-xl border border-border p-4">
         <h2 className="text-sm font-semibold">Live computer / browse feed</h2>
@@ -163,8 +282,10 @@ export function HelixEnginePage() {
           <h2 className="text-sm font-semibold">Trajectory</h2>
           <button
             type="button"
-            className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground"
+            className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
             onClick={() => void analyzeSession()}
+            disabled={steps.length === 0}
+            title={steps.length ? "Analyze the captured trajectory" : "No captured tool steps yet"}
           >
             Analyze
           </button>

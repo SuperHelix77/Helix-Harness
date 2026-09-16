@@ -1767,7 +1767,7 @@ export function ModelsPage() {
   const catalogCovered = detailOpen && !splitMode;
 
   return (
-    <div className="hub-page flex min-h-0 min-w-0 flex-1 basis-0 flex-col overflow-hidden bg-background">
+    <div className="hub-page flex min-h-0 min-w-0 flex-1 basis-0 flex-col overflow-hidden app-main-background">
       <HubTopBar>
         <ModelsHeader
           cachedCount={visibleCachedCount}

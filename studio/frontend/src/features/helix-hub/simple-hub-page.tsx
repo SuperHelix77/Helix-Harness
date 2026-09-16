@@ -77,7 +77,7 @@ export function ModelsPage() {
       <div>
         <h1 className="text-lg font-semibold">Helix Harness models</h1>
         <p className="text-sm text-muted-foreground">
-          Simpler hub: list local GGUF files, select one, load through Chat. Built on Unsloth Studio groundwork.
+          Simpler hub: list local GGUF files, select one, load through Chat. Built on upstream Unsloth components.
         </p>
       </div>
       <label className="flex flex-col gap-1 text-sm">

@@ -180,6 +180,12 @@
 
 	/* Slightly warm off white; every page (and the chat surface) shares it. */
 	--background: #fefefd;
+	--main-background-alpha: 100%;
+	--main-background-surface: color-mix(
+		in srgb,
+		var(--background) var(--main-background-alpha),
+		transparent
+	);
 	--foreground: oklch(0.2686 0 0);
 	--card: oklch(1 0 0);
 	--card-foreground: oklch(0.1281 0.0179 169.2764);
@@ -676,6 +682,7 @@ html[data-palette="glass"] body {
 html[data-palette="glass"] body::before {
 	content: "";
 	position: fixed;
+	opacity: var(--main-background-alpha);
 	inset: 0;
 	z-index: -1;
 	pointer-events: none;
@@ -693,10 +700,18 @@ html.dark[data-palette="glass"] body::before {
 html[data-palette="glass"] [data-sidebar="sidebar"],
 html[data-palette="glass"] [data-slot="card"],
 html[data-palette="glass"] .bg-background,
+html[data-palette="glass"] .app-main-background,
 html[data-palette="glass"] .bg-card,
 html[data-palette="glass"] .unsloth-composer-surface {
 	backdrop-filter: blur(var(--glass-blur)) saturate(1.35);
 	-webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.35);
+}
+
+.app-main-background {
+	background-color: var(--background);
+}
+html[data-palette="glass"] .app-main-background {
+	background-color: var(--main-background-surface);
 }
 
 /* Smart ink: logos and chrome text follow the painted background, not just

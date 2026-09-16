@@ -130,7 +130,7 @@ const HELP_TEXT =
   "Local commands: /github (read linked GitHub), /plan, /goal, /speed, /learn, /reflect, and /skills. " +
   "You can also choose them from the Skills button.";
 
-/** Parse only commands owned by Unsloth Studio; ordinary slash-prefixed prose is preserved. */
+/** Parse only commands owned by Helix Harness; ordinary slash-prefixed prose is preserved. */
 export function parseLocalSlashCommand(
   input: string,
   installedSkills: readonly InstalledLocalSkill[] = [],
