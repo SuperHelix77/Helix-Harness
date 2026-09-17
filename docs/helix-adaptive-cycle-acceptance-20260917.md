@@ -222,6 +222,27 @@ A `helix.counterfactual.v1` shorter candidate is generated but remains `UNVERIFI
 
 **No.** This acceptance demonstrates the control architecture and safeguards. It does not demonstrate improved Qwythos/Qwen weights, held-out task quality, general intelligence, mature controller calibration, verified counterfactual equivalence, or an equivalent-quality cache optimization speedup.
 
+## macOS packaged-app follow-up
+
+After source commit `5e8af2a2c6fb8cedf5a2a8364c2c797ec116a0ea` was pushed, the macOS app was rebuilt from that exact source and installed as `/Users/mert/Desktop/Helix Harness v2.app` while preserving bundle identifier `ai.helix.harness.v2` and version `1.1.0`.
+
+The completion-source runtime overlay now contains:
+
+- contract: `helix.adaptive.backend.v1`;
+- runtime files: `639`;
+- tree SHA-256: `5fc6075a4b5fe62581b51dbf8c8fbbf2d90c6d33df747f10dd1081c9312f132e`;
+- tests: excluded;
+- `.pyc`/`.pyo`: excluded;
+- backend `requirements/`: excluded.
+
+The historical 640-file bundle had one additional non-current asset, `assets/datasets/alpaca_unsloth.json`; it is absent from the current source, so the 639-file count is expected rather than an omitted completion file. The embedded manifest equals the staged manifest, and the packaged copies of `core/helix_engine/audit.py`, `controller.py`, `decision_controller.py`, `evidence.py`, `trajectory.py`, `routes/helix_engine.py`, and `routes/inference.py` are byte-identical to the completion source.
+
+The clean Tauri release artifact under `studio/src-tauri/target/release/bundle/macos/Helix Harness v2.app` passes `codesign --verify --deep --strict`; signing is ad-hoc and the app is not notarized. The top-level Desktop directory is managed by the macOS/iCloud file provider, which automatically attaches an empty `com.apple.FinderInfo` xattr to top-level `.app` bundles. That metadata makes strict `codesign` verification complain on the Desktop copy even though its executable, `Info.plist`, `_CodeSignature/CodeResources`, overlay manifest, and overlay applier are byte-identical to the clean strictly verified build artifact. Do not represent the app as notarized or Gatekeeper-ready.
+
+The overlay was then applied from the installed app's own `Contents/Resources/helix-backend` using the managed Python runtime. It reported `639 overrides`, `mem0=ready`, the managed backend imported the expected contract plus `require_tool_access`, `run_closed_loop`, and `prepare_observable_self_audit`, and the seven critical packaged backend files above matched the installed runtime byte-for-byte.
+
+Live packaged-app smoke succeeded twice. The Desktop app launched the managed backend on `127.0.0.1:8888`; `/api/liveness` and `/api/health` returned HTTP 200 with `service="Helix Harness"` and Tauri desktop ownership. A graceful app quit terminated both the Tauri process and its backend and closed port 8888. A cold relaunch reached `/api/health` HTTP 200 again after 24 seconds. This establishes packaged-app parity for the completion source. It does not prove the separate native GUI updater orchestration end-to-end after a destructive managed update.
+
 ## Remaining evidence boundaries
 
 1. decision calibration is measured but statistically immature and remains `calibrated=false`;
@@ -229,4 +250,4 @@ A `helix.counterfactual.v1` shorter candidate is generated but remains `UNVERIFI
 3. request-scoped GGUF speculative accepted/rejected counters remain unavailable;
 4. no held-out before/after model-quality evaluation demonstrates weight improvement;
 5. no equivalent-quality before/after experiment demonstrates a cache-optimization speedup;
-6. the existing installed `Helix Harness v2.app` and managed overlay were not rebuilt from this completion source, so source/GitHub completion is not packaged-app parity.
+6. the rebuilt app has not yet been driven through the native Tauri updater command against another destructive managed-runtime overwrite, so strongest-form updater self-repair proof remains separate from packaged-app parity.

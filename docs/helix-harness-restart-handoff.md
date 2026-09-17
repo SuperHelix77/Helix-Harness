@@ -20,9 +20,17 @@ files:    640
 sha256:   09b8dd171c857bea0184b22ef663cba21655101b6fc44e53ccdcd8009e787f28
 ```
 
-The existing desktop app is `/Users/mert/Desktop/Helix Harness v2.app` (`ai.helix.harness.v2`). It is ad-hoc signed and not notarized.
+Current completion-source packaged overlay, rebuilt from commit `5e8af2a2c6fb8cedf5a2a8364c2c797ec116a0ea`:
 
-Managed runtime is Unsloth `2026.9.5`; Mem0 is `2.0.20`. This completion pass validated repository source using the managed Python environment but **did not rebuild/re-fingerprint the desktop app or managed overlay from the completion source**. Do not claim installed-app parity until a later packaging pass actually stages and validates these new backend/frontend files.
+```text
+contract: helix.adaptive.backend.v1
+files:    639
+sha256:   5fc6075a4b5fe62581b51dbf8c8fbbf2d90c6d33df747f10dd1081c9312f132e
+```
+
+The current desktop app is `/Users/mert/Desktop/Helix Harness v2.app` (`ai.helix.harness.v2`, version `1.1.0`). It is an arm64 Tauri release build, ad-hoc signed and not notarized. The clean release artifact passes strict deep codesign verification. The iCloud-managed Desktop root automatically attaches `com.apple.FinderInfo` to top-level app bundles, so strict codesign verification of the Desktop copy itself reports that filesystem metadata even though the signed executable/resources are byte-identical to the clean verified artifact.
+
+Managed runtime is Unsloth `2026.9.5`; Mem0 is `2.0.20`. The completion overlay was applied from the installed app's own Resources and validated against the managed runtime. Packaged-app parity with the completion source is therefore established. Native GUI updater self-repair after a fresh destructive update remains a separate unproven boundary.
 
 ## Core features now closed
 
@@ -87,8 +95,13 @@ Managed runtime is Unsloth `2026.9.5`; Mem0 is `2.0.20`. This completion pass va
 - Frontend production build: **PASS**; only the established `::highlight`, dynamic-import and chunk-size warnings remain.
 - Ruff across **20** modified/untracked Python files: **PASS**.
 - `git diff --check`: **PASS**.
+- Completion-source macOS app rebuild: **PASS** (`ai.helix.harness.v2`, arm64, version `1.1.0`).
+- Embedded completion overlay: **639 files**, SHA-256 `5fc6075a4b5fe62581b51dbf8c8fbbf2d90c6d33df747f10dd1081c9312f132e`; no tests/bytecode/backend requirements.
+- Clean release bundle `codesign --verify --deep --strict`: **PASS**; signing remains ad-hoc and not notarized.
+- Installed-overlay application from app Resources: **PASS**, `mem0=ready`; critical adaptive-cycle files match the packaged overlay.
+- Packaged app live smoke: **PASS**; `/api/liveness` and `/api/health` HTTP 200, graceful quit reaped the managed backend, cold relaunch returned healthy again after 24 seconds.
 
-These are the final source-completion checks. Historical v2 packaging/MLX/inference checks remain documented in `docs/helix-harness-v2-validation-20260916.md`; they were not rerun merely to imply that the older installed `.app` contains this completion source.
+These source-completion and packaging checks establish that the installed v2 app now contains the completion frontend and dependency-closed adaptive backend overlay. Historical MLX/inference checks remain documented in `docs/helix-harness-v2-validation-20260916.md` and were not unnecessarily repeated.
 
 Full historical v2 acceptance details are in `docs/helix-harness-v2-validation-20260916.md`.
 
@@ -103,7 +116,6 @@ The original Jev/Empryo/self-audit → Hermes plan was re-audited on 2026-09-17 
 5. Counterfactual trajectory compression now has a versioned candidate/provenance record, but no backend replay/equivalence verifier exists yet. Therefore these candidates cannot become efficiency-training pairs.
 6. Decision-controller probabilities now have objective retrospective labels/Brier bins, but the sample is not a held-out calibration study. `calibrated=false` is the correct current status.
 7. GGUF request-scoped speculative accepted/rejected draft counters remain unavailable and are represented as unavailable, not as observed zero measurements.
-8. The existing installed desktop app/managed overlay was not rebuilt from this source-completion pass.
 
 ## Prohibitions
 
@@ -118,4 +130,4 @@ The original Jev/Empryo/self-audit → Hermes plan was re-audited on 2026-09-17 
 - no global GGUF speculative counters represented as request-scoped proof;
 - no unsupported performance claim;
 - no claim of Qwythos/27B/general model improvement without held-out before/after evidence;
-- no claim of packaged desktop parity until the app/overlay is rebuilt and revalidated.
+- no claim that native updater orchestration has been proven end-to-end until the rebuilt app itself survives a fresh destructive managed update through that GUI/update command.
