@@ -17,6 +17,7 @@ import threading
 
 import pytest
 
+from core.helix_engine.capture import capture_session_key, clear_session, session_control_events
 from core.inference import passthrough_healing
 from core.inference import studio_tool_loop as loop_mod
 from core.inference.studio_tool_loop import (
@@ -136,6 +137,7 @@ def _run(
     tools = None,
     tool_choice = None,
     messages = None,
+    helix_turn_id = None,
     **policy_kwargs,
 ):
     policy_fields = {
@@ -159,6 +161,7 @@ def _run(
                 session_id = "s1",
                 thread_id = "t1",
                 tool_choice = tool_choice,
+                helix_turn_id = helix_turn_id,
             ),
             policy = ToolLoopPolicy(**policy_fields),
             cancel_event = cancel_event,
@@ -291,6 +294,78 @@ def test_a_conversation_search_here_gets_the_active_branch(executed):
         executed[0]["conversation_budget_tokens"]
         == rag_config.CHUNK_TOKENS * rag_config.CONVERSATION_ARCHIVE_TOP_K
     )
+
+
+def test_equivalent_memory_alias_is_suppressed_before_external_tool_execution(executed):
+    """Provider loops use the same live semantic-duplicate controller as local loops."""
+    turn_id = "external-equivalent-alias"
+    capture_key = capture_session_key("s1", "t1", turn_id)
+    clear_session(capture_key)
+    transport = FakeTransport(
+        [
+            [
+                _sse(
+                    {
+                        "tool_calls": [
+                            {
+                                "index": 0,
+                                "id": "call_memory",
+                                "function": {
+                                    "name": "search_memory",
+                                    "arguments": '{"query":"same memory"}',
+                                },
+                            }
+                        ]
+                    }
+                ),
+                _sse(finish = "tool_calls"),
+                _DONE,
+            ],
+            [
+                _sse(
+                    {
+                        "tool_calls": [
+                            {
+                                "index": 0,
+                                "id": "call_alias",
+                                "function": {
+                                    "name": "search_conversation",
+                                    "arguments": '{"query":"same memory"}',
+                                },
+                            }
+                        ]
+                    }
+                ),
+                _sse(finish = "tool_calls"),
+                _DONE,
+            ],
+            [_sse({"content": "I already have the evidence."}), _sse(finish = "stop"), _DONE],
+        ]
+    )
+
+    lines = _run(
+        transport,
+        tools = [_tool("search_memory"), _tool("search_conversation")],
+        helix_turn_id = turn_id,
+    )
+
+    assert [call["name"] for call in executed] == ["search_memory"]
+    skipped = [
+        event
+        for event in _events(lines, "tool_end")
+        if event.get("tool_name") == "search_conversation"
+    ]
+    assert len(skipped) == 1
+    assert "equivalent read-only retrieval" in skipped[0]["result"]
+    assert skipped[0]["provenance"]["controller_action"] == "equivalent_duplicate"
+    assert skipped[0]["provenance"]["equivalent_to"] == "search_memory"
+    assert skipped[0]["provenance"]["loop_progress"]["suppressed_equivalent_duplicates"] == 1
+    captured_controls = session_control_events(capture_key)
+    assert len(captured_controls) == 1
+    assert captured_controls[0].schema_version == "helix.tool-control.v1"
+    assert captured_controls[0].action == "equivalent_duplicate"
+    assert captured_controls[0].equivalent_to == "search_memory"
+    assert "I already have the evidence." in _visible_text(lines)
 
 
 def test_streamed_tool_name_fragments_are_not_concatenated(executed):

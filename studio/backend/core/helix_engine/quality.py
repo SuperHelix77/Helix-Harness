@@ -14,6 +14,22 @@ def build_quality_vector(
     audit: SelfAuditReport,
 ) -> QualityVector:
     extras = traj.extras if isinstance(traj.extras, dict) else {}
+    control_events = (
+        extras.get("tool_control_events")
+        if isinstance(extras.get("tool_control_events"), list)
+        else []
+    )
+    prevented_exact = sum(
+        isinstance(item, dict) and item.get("action") == "duplicate" for item in control_events
+    )
+    prevented_equivalent = sum(
+        isinstance(item, dict) and item.get("action") == "equivalent_duplicate"
+        for item in control_events
+    )
+    prevented_repeated_failure = sum(
+        isinstance(item, dict) and item.get("action") == "repeated_failure"
+        for item in control_events
+    )
     objective_verified = extras.get("objective_verified") is True
     task_claim = next((item for item in evidence if item.claim_id == "task-outcome"), None)
     task_contradicted = bool(task_claim and task_claim.status == EvidenceStatus.CONTRADICTED)
@@ -55,6 +71,12 @@ def build_quality_vector(
             "tool_calls": len(traj.steps),
             "redundant_tool_calls": redundant,
             "failed_tool_calls": failed,
+            # Prevented calls are behavioral observations, not computational cost:
+            # they intentionally do not reduce C because the runtime avoided them.
+            "prevented_tool_calls": len(control_events),
+            "prevented_exact_duplicates": prevented_exact,
+            "prevented_equivalent_duplicates": prevented_equivalent,
+            "prevented_repeated_failures": prevented_repeated_failure,
             "prompt_tokens": traj.prompt_tokens or cache.prompt_tokens,
             "completion_tokens": traj.completion_tokens,
             "cached_tokens": cache.cached_tokens,

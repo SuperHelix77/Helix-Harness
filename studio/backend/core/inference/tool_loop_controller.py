@@ -17,7 +17,7 @@ import json
 import math
 import re
 from dataclasses import dataclass, field
-from typing import Any, Collection, Literal, Mapping, Sequence
+from typing import Any, Callable, Collection, Literal, Mapping, Sequence
 from urllib.parse import urlparse
 
 from core.inference.tool_call_parser import TOOL_ERROR_NUDGE, TOOL_ERROR_PREFIXES
@@ -170,8 +170,78 @@ def _unreadable_arguments_summary(fragment: str) -> dict[str, str]:
 
 _ONE_SHOT_TOOLS = frozenset({"render_html"})
 
-NoopReason = Literal["duplicate", "disabled", "forced_mismatch", "render_html_repeat"]
-ToolAction = Literal["execute", "duplicate", "disabled", "forced_mismatch", "render_html_repeat"]
+# Proven read-only aliases that dispatch to the same implementation with the same
+# arguments.  Keep this deliberately tiny and explicit: semantic-equivalence is a
+# stronger statement than "these tools sound similar", and suppressing a real call
+# on a guessed equivalence would trade efficiency for correctness.  The two memory
+# search names are intentionally public aliases over `_search_conversation`.
+_EQUIVALENT_READ_ONLY_TOOL_FAMILIES = {
+    "search_memory": "thread_memory_search",
+    "search_conversation": "thread_memory_search",
+}
+
+_EDIT_VERIFICATION_NUDGE = (
+    "\n\nYou changed workspace content. Before claiming the task is complete, run the "
+    "most relevant available verification (for example a targeted test, build, "
+    "typecheck, lint, or diff check) when practical. If verification is unavailable "
+    "or explicitly outside the user's requested scope, say that clearly instead of "
+    "implying it passed. Do not run unrelated checks just to satisfy this reminder."
+)
+
+# Conservative command markers for *observing* that a post-edit verification ran.
+# This metadata never makes a test authoritative evidence; backend verifier receipts
+# still own that role.  The list is intentionally specific enough that `cat`, `ls`,
+# install commands and arbitrary shell work do not clear verification debt.
+_VERIFICATION_COMMAND_MARKERS = (
+    "pytest",
+    "unittest",
+    "npm test",
+    "npm run test",
+    "npm run typecheck",
+    "npm run build",
+    "run typecheck",
+    "run build",
+    "pnpm test",
+    "pnpm run test",
+    "pnpm run typecheck",
+    "pnpm run build",
+    "yarn test",
+    "yarn typecheck",
+    "yarn build",
+    "tsc ",
+    "node --test",
+    "ruff ",
+    "eslint ",
+    "biome ",
+    "cargo test",
+    "cargo check",
+    "cargo clippy",
+    "go test",
+    "swift test",
+    "dotnet test",
+    "mvn test",
+    "gradle test",
+    "xcodebuild test",
+    "git diff --check",
+)
+
+NoopReason = Literal[
+    "duplicate",
+    "equivalent_duplicate",
+    "repeated_failure",
+    "disabled",
+    "forced_mismatch",
+    "render_html_repeat",
+]
+ToolAction = Literal[
+    "execute",
+    "duplicate",
+    "equivalent_duplicate",
+    "repeated_failure",
+    "disabled",
+    "forced_mismatch",
+    "render_html_repeat",
+]
 
 
 @dataclass(frozen = True)
@@ -203,6 +273,9 @@ class ToolCallDecision:
     # conversation replays; otherwise the two are the same.
     card_call_id: str = ""
     key: str = ""
+    equivalence_key: str = ""
+    equivalent_to: str = ""
+    failed_attempts: int = 0
     provenance: dict[str, Any] = field(default_factory = dict)
     status_text: str = ""
     noop_result: str = ""
@@ -319,6 +392,11 @@ class ToolCallCompletion:
         content = strip_result_for_model(self.result, self.decision.tool_name)
         if self.is_error:
             content = content + TOOL_ERROR_NUDGE
+        elif self.decision.tool_name == "edit_file":
+            # Model-facing only: the visible tool card keeps the exact real result.
+            # This creates a verification obligation without fabricating a test or
+            # forcing one when the user explicitly scoped verification out.
+            content = content + _EDIT_VERIFICATION_NUDGE
         message: dict[str, Any] = {
             "role": "tool",
             "name": self.decision.tool_name,
@@ -351,6 +429,92 @@ def canonical_tool_call_key(tool_name: str, arguments: Mapping[str, Any]) -> str
         default = _json_default,
     )
     return f"{tool_name}:{canonical_args}"
+
+
+def equivalent_tool_call_key(tool_name: str, arguments: Mapping[str, Any]) -> str:
+    """Stable key for a *proven* read-only alias family, or ``""``.
+
+    Exact tool identity still owns ``canonical_tool_call_key``.  This second key is
+    intentionally separate so workspace invalidation, per-tool success checks and
+    forced tool-choice contracts keep their existing semantics.
+    """
+    family = _EQUIVALENT_READ_ONLY_TOOL_FAMILIES.get(tool_name)
+    if not family:
+        return ""
+    canonical_args = json.dumps(
+        dict(arguments),
+        ensure_ascii = False,
+        sort_keys = True,
+        separators = (",", ":"),
+        default = _json_default,
+    )
+    return f"{family}:{canonical_args}"
+
+
+def _is_verification_call(tool_name: str, arguments: Mapping[str, Any]) -> bool:
+    if tool_name != "terminal":
+        return False
+    command = str(arguments.get("command") or "").strip().lower()
+    if not command:
+        return False
+    return any(marker in command for marker in _VERIFICATION_COMMAND_MARKERS)
+
+
+def make_optional_helix_control_observer(
+    session_id: str | None,
+    thread_id: str | None,
+    helix_turn_id: str | None,
+):
+    """Create the optional Helix no-op observer without making it a loop dependency."""
+    if not str(helix_turn_id or "").strip():
+        return None
+    try:
+        from core.helix_engine.capture import make_tool_control_observer
+
+        return make_tool_control_observer(session_id, thread_id, helix_turn_id)
+    except BaseException:
+        # The foreground tool loop must survive any optional Helix import/state fault.
+        return None
+
+
+def explicit_user_tool_mentions(
+    messages: Sequence[Mapping[str, Any]],
+    tool_names: Collection[str],
+) -> set[str]:
+    """Exact tool identifiers literally requested by the user in visible messages.
+
+    This is a narrow correctness escape hatch for deterministic semantic dedup.  A
+    user who explicitly asks to exercise two equivalent APIs is specifying an
+    action, not merely asking for the evidence.  Internal role=user recovery nudges
+    are added only after the controller is constructed, so callers should pass the
+    request's original/current message list here.
+    """
+    candidates = {str(name) for name in tool_names if str(name)}
+    if not candidates:
+        return set()
+    found: set[str] = set()
+    # Only the current/latest user request is authoritative for this response.
+    # Older conversation turns may mention implementation tool names for entirely
+    # different tasks and must not permanently disable an efficiency invariant.
+    for message in reversed(messages):
+        if str(message.get("role") or "") != "user":
+            continue
+        content = message.get("content")
+        if isinstance(content, str):
+            text = content
+        elif isinstance(content, list):
+            text = "\n".join(
+                str(item.get("text") or "")
+                for item in content
+                if isinstance(item, Mapping)
+            )
+        else:
+            continue
+        for name in candidates - found:
+            if re.search(rf"(?<![A-Za-z0-9_]){re.escape(name)}(?![A-Za-z0-9_])", text):
+                found.add(name)
+        break
+    return found
 
 
 # "0"/"1" are left out: a native `0` arrives already typed, so they would mean two things
@@ -985,7 +1149,13 @@ def _tool_name_from_schema(tool: Mapping[str, Any]) -> str:
     return str(name or "")
 
 
-def _noop_result(reason: NoopReason, tool_name: str) -> str:
+def _noop_result(
+    reason: NoopReason,
+    tool_name: str,
+    *,
+    equivalent_to: str = "",
+    failed_attempts: int = 0,
+) -> str:
     if reason == "duplicate":
         return (
             f"One earlier request to call tool '{tool_name}' in this batch was "
@@ -994,6 +1164,24 @@ def _noop_result(reason: NoopReason, tool_name: str) -> str:
             "tool call. Continue with a different enabled tool if that would "
             "materially help, or provide the final answer if you have enough "
             "information."
+        )
+    if reason == "equivalent_duplicate":
+        prior = equivalent_to or "an equivalent retrieval tool"
+        return (
+            f"Unsloth did not execute tool '{tool_name}' because '{prior}' already "
+            "completed the same read-only retrieval with the same arguments in this "
+            "assistant response. These are equivalent retrieval paths here, so repeating "
+            "the alias would add no new evidence. Use a materially different query/tool "
+            "if more evidence is needed, or provide the final answer."
+        )
+    if reason == "repeated_failure":
+        attempts = max(2, int(failed_attempts or 0))
+        return (
+            f"Unsloth did not execute tool '{tool_name}' again because this exact call "
+            f"already failed {attempts} times without any intervening state change that "
+            "would make the same attempt different. Inspect the existing error and change "
+            "the arguments, use a different tool/strategy, perform prerequisite work, or "
+            "give the final answer with the limitation. Do not retry this exact call unchanged."
         )
     if reason == "render_html_repeat":
         return (
@@ -1025,6 +1213,9 @@ class ToolLoopController:
         auto_heal_tool_calls: bool = True,
         one_shot_tools: frozenset[str] = _ONE_SHOT_TOOLS,
         duplicate_noop_limit: int = 2,
+        repeated_failure_limit: int = 3,
+        control_observer: Callable[[ToolCallDecision, Mapping[str, Any]], None] | None = None,
+        semantic_dedup_exempt_tools: Collection[str] | None = None,
     ) -> None:
         self._restrict_to_allowed = tools is not None
         self._tools = [copy.deepcopy(dict(tool)) for tool in (tools or [])]
@@ -1035,6 +1226,19 @@ class ToolLoopController:
         self._one_shot_tools = one_shot_tools
         self._completed_one_shot_tools: set[str] = set()
         self._successful_keys: set[str] = set()
+        self._successful_equivalent_keys: dict[str, str] = {}
+        self._successful_equivalent_family_tool: dict[str, str] = {}
+        # Exact failed call -> consecutive failures since the last relevant state
+        # change.  Two real retries are intentionally allowed by the default; the
+        # next identical attempt is where repeating stops being recovery and becomes
+        # a loop.  This is conservative for transient network/tool failures.
+        self._failure_counts: dict[str, int] = {}
+        self._failure_novel_at: dict[str, int] = {}
+        self._repeated_failure_limit = max(1, repeated_failure_limit)
+        self._control_observer = control_observer
+        self._semantic_dedup_exempt_tools = {
+            str(name) for name in (semantic_dedup_exempt_tools or ()) if str(name)
+        }
         # `_workspace_novel_at[key]` is the distinct-call count when `key` last ran.
         self._workspace_ran: set[str] = set()
         self._workspace_novel = 0
@@ -1042,11 +1246,37 @@ class ToolLoopController:
         self._duplicate_noop_counts: dict[str, int] = {}
         self._duplicate_noop_limit = max(1, duplicate_noop_limit)
         self._history: list[_ToolCallRecord] = []
+        self._executed_count = 0
+        self._successful_count = 0
+        self._failed_count = 0
+        self._suppressed_exact_duplicates = 0
+        self._suppressed_equivalent_duplicates = 0
+        self._suppressed_repeated_failures = 0
         self._force_final_answer = False
+        self._verification_pending = False
+        self._verification_runs = 0
 
     @property
     def history(self) -> tuple[_ToolCallRecord, ...]:
         return tuple(self._history)
+
+    def progress_snapshot(self) -> dict[str, int | bool]:
+        """Bounded objective progress counters for diagnostics/telemetry.
+
+        This is deliberately derived from the in-memory ledger rather than model
+        self-report.  It is not a success score and does not decide task correctness.
+        """
+        return {
+            "executed_calls": self._executed_count,
+            "successful_calls": self._successful_count,
+            "failed_calls": self._failed_count,
+            "suppressed_exact_duplicates": self._suppressed_exact_duplicates,
+            "suppressed_equivalent_duplicates": self._suppressed_equivalent_duplicates,
+            "suppressed_repeated_failures": self._suppressed_repeated_failures,
+            "verification_pending": self._verification_pending,
+            "verification_runs": self._verification_runs,
+            "force_final_answer": self._force_final_answer,
+        }
 
     @property
     def force_final_answer(self) -> bool:
@@ -1062,6 +1292,11 @@ class ToolLoopController:
             name = _tool_name_from_schema(tool)
             if name in self._completed_one_shot_tools:
                 continue
+            family = _EQUIVALENT_READ_ONLY_TOOL_FAMILIES.get(name)
+            if family and name not in self._semantic_dedup_exempt_tools:
+                chosen = self._successful_equivalent_family_tool.get(family)
+                if chosen and chosen != name:
+                    continue
             active.append(copy.deepcopy(tool))
         return active
 
@@ -1084,6 +1319,7 @@ class ToolLoopController:
             tool_schemas = self._tools,
         )
         key = canonical_tool_call_key(tool_name, coerced.arguments)
+        equivalence_key = equivalent_tool_call_key(tool_name, coerced.arguments)
         mcp = mcp_display_parts(tool_name)
         provenance = tool_event_provenance(
             healed = coerced.healed,
@@ -1093,6 +1329,8 @@ class ToolLoopController:
         )
         action: ToolAction = "execute"
         noop = ""
+        equivalent_to = ""
+        failed_attempts = self._failure_counts.get(key, 0)
         if tool_name in self._completed_one_shot_tools:
             action = "render_html_repeat"
             noop = _noop_result("render_html_repeat", tool_name)
@@ -1105,6 +1343,34 @@ class ToolLoopController:
         elif key in self._successful_keys:
             action = "duplicate"
             noop = _noop_result("duplicate", tool_name)
+        elif (
+            not forced
+            and allowed_tool_names is None
+            and tool_name not in self._semantic_dedup_exempt_tools
+            and equivalence_key
+            and equivalence_key in self._successful_equivalent_keys
+        ):
+            action = "equivalent_duplicate"
+            equivalent_to = self._successful_equivalent_keys[equivalence_key]
+            noop = _noop_result(
+                "equivalent_duplicate",
+                tool_name,
+                equivalent_to=equivalent_to,
+            )
+        elif not forced and failed_attempts >= self._repeated_failure_limit:
+            action = "repeated_failure"
+            noop = _noop_result(
+                "repeated_failure",
+                tool_name,
+                failed_attempts=failed_attempts,
+            )
+
+        if failed_attempts:
+            provenance["prior_failures"] = failed_attempts
+        if action != "execute":
+            provenance["controller_action"] = action
+        if equivalent_to:
+            provenance["equivalent_to"] = equivalent_to
 
         return ToolCallDecision(
             action = action,
@@ -1113,6 +1379,9 @@ class ToolLoopController:
             tool_call_id = str(tool_call.get("id") or ""),
             card_call_id = str(tool_call.get("card_id") or ""),
             key = key,
+            equivalence_key = equivalence_key,
+            equivalent_to = equivalent_to,
+            failed_attempts = failed_attempts,
             provenance = provenance,
             status_text = status_for_tool(tool_name, coerced.arguments),
             noop_result = noop,
@@ -1130,6 +1399,11 @@ class ToolLoopController:
                 action = decision.action,
             )
         )
+        self._executed_count += 1
+        if failed:
+            self._failed_count += 1
+        else:
+            self._successful_count += 1
         # One rerun per piece of NEW work, not per call: `read, edit, read, edit` would
         # otherwise apply the edit twice. Here as well as in the prefilters, which a
         # structured batch skips. A failed command can still have written, so it counts too.
@@ -1146,11 +1420,45 @@ class ToolLoopController:
             self._successful_keys -= stale
             for key in stale:
                 self._duplicate_noop_counts.pop(key, None)
+            stale_failures = {
+                key
+                for key in self._failure_counts
+                if key.partition(":")[0] in _WORKSPACE_TOOLS
+                and self._failure_novel_at.get(key, 0) < self._workspace_novel
+            }
+            for key in stale_failures:
+                self._failure_counts.pop(key, None)
+                self._failure_novel_at.pop(key, None)
+                self._duplicate_noop_counts.pop(key, None)
             self._workspace_novel_at[decision.key] = self._workspace_novel
         if not failed:
             self._successful_keys.add(decision.key)
+            self._failure_counts.pop(decision.key, None)
+            self._failure_novel_at.pop(decision.key, None)
+            if decision.equivalence_key:
+                self._successful_equivalent_keys[decision.equivalence_key] = decision.tool_name
+                family = _EQUIVALENT_READ_ONLY_TOOL_FAMILIES.get(decision.tool_name)
+                if family:
+                    self._successful_equivalent_family_tool.setdefault(family, decision.tool_name)
             if decision.tool_name in self._one_shot_tools:
                 self._completed_one_shot_tools.add(decision.tool_name)
+            if decision.tool_name == "edit_file":
+                self._verification_pending = True
+            elif self._verification_pending and _is_verification_call(
+                decision.tool_name, decision.arguments
+            ):
+                self._verification_pending = False
+                self._verification_runs += 1
+        else:
+            self._failure_counts[decision.key] = self._failure_counts.get(decision.key, 0) + 1
+            if decision.tool_name in _WORKSPACE_TOOLS:
+                self._failure_novel_at[decision.key] = self._workspace_novel
+        # The decision owns a mutable provenance envelope even though the dataclass is
+        # frozen.  Tool-end events are emitted after record_result(), so attaching a
+        # small derived snapshot here gives the UI/log stream objective progress data
+        # without adding another hot-path store or trusting model self-report.
+        progress = self.progress_snapshot()
+        decision.provenance["loop_progress"] = progress
         return ToolCallCompletion(
             decision = decision,
             result = result_text,
@@ -1169,12 +1477,26 @@ class ToolLoopController:
             )
         )
         if decision.action == "duplicate":
+            self._suppressed_exact_duplicates += 1
+        elif decision.action == "equivalent_duplicate":
+            self._suppressed_equivalent_duplicates += 1
+        elif decision.action == "repeated_failure":
+            self._suppressed_repeated_failures += 1
+        if decision.action in ("duplicate", "equivalent_duplicate", "repeated_failure"):
             duplicate_count = self._duplicate_noop_counts.get(decision.key, 0) + 1
             self._duplicate_noop_counts[decision.key] = duplicate_count
             if duplicate_count >= self._duplicate_noop_limit:
                 self._force_final_answer = True
         elif decision.action in ("disabled", "render_html_repeat"):
             self._force_final_answer = True
+        progress = self.progress_snapshot()
+        decision.provenance["loop_progress"] = progress
+        if self._control_observer is not None:
+            try:
+                self._control_observer(decision, progress)
+            except BaseException:
+                # Observation remains fail-open even if a caller supplied a bad sink.
+                pass
         return ToolCallCompletion(
             decision = decision,
             result = decision.noop_result,

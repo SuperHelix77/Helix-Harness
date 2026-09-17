@@ -134,6 +134,14 @@ test("self-audit prompt preserves backend-resolved evidence/cache/test artifacts
     telemetry: { prompt_tokens: 100, cached_tokens: 40 },
     cache_integrity: { cache_reuse_ratio: 0.4, unavailable_fields: ["kv_cache_resets"] },
     evidence: [{ claim_id: "task-outcome", status: "UNVERIFIED", missing_evidence: ["test"] }],
+    control_events: [
+      {
+        schema_version: "helix.tool-control.v1",
+        action: "equivalent_duplicate",
+        tool_name: "search_conversation",
+        equivalent_to: "search_memory",
+      },
+    ],
     objective_outcome_evidence: [{ claim_id: "task-outcome", status: "UNVERIFIED" }],
     edits: [{ name: "edit_file", result: "changed" }],
     tests: [{ name: "pytest", verification: { kind: "test", status: "passed" } }],
@@ -151,6 +159,10 @@ test("self-audit prompt preserves backend-resolved evidence/cache/test artifacts
   assert.deepEqual(artifacts.acceptance_criteria, ["tests pass"]);
   assert.equal((artifacts.cache_integrity as Record<string, unknown>).cache_reuse_ratio, 0.4);
   assert.equal((artifacts.evidence as Array<Record<string, unknown>>)[0]?.status, "UNVERIFIED");
+  assert.equal(
+    (artifacts.control_events as Array<Record<string, unknown>>)[0]?.action,
+    "equivalent_duplicate",
+  );
   assert.equal((artifacts.tests as Array<Record<string, unknown>>)[0]?.name, "pytest");
   assert.equal((artifacts.benchmarks as Array<Record<string, unknown>>)[0]?.name, "bench");
   const trajectory = artifacts.trajectory as Record<string, unknown>;

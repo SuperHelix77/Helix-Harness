@@ -59,6 +59,8 @@ from core.inference.tool_loop_controller import (
     ToolLoopController,
     awaiting_approval_status,
     canonical_arguments_text,
+    explicit_user_tool_mentions,
+    make_optional_helix_control_observer,
     mcp_display_parts,
     strip_result_for_model,
 )
@@ -100,6 +102,14 @@ _TOOL_TRUNCATED = (
 # delta, so it needs a short result; the long model-facing nudge stays in the conversation.
 _TOOL_SKIPPED = {
     "duplicate": "Unsloth did not run this call because an identical one had already completed.",
+    "equivalent_duplicate": (
+        "Unsloth did not run this call because an equivalent read-only retrieval with the "
+        "same arguments had already completed."
+    ),
+    "repeated_failure": (
+        "Unsloth did not run this call because the exact same attempt had already failed "
+        "repeatedly without an intervening state change."
+    ),
     "disabled": _TOOL_DISABLED,
     "render_html_repeat": "Unsloth did not run this call because render_html already ran.",
 }
@@ -339,6 +349,7 @@ class ToolLoopRun:
     model: str | None = None
     tool_choice: Any = None
     continue_final_message: bool = False
+    helix_turn_id: str | None = None
 
 
 @dataclass(frozen = True)
@@ -1227,6 +1238,12 @@ async def stream_with_studio_tools(
     controller = ToolLoopController(
         tools = tools,
         auto_heal_tool_calls = policy.auto_heal is not False,
+        control_observer = make_optional_helix_control_observer(
+            run.session_id, run.thread_id, run.helix_turn_id
+        ),
+        semantic_dedup_exempt_tools = explicit_user_tool_mentions(
+            run.messages, {"search_memory", "search_conversation"}
+        ),
     )
     tool_hint = ", ".join(sorted(allowed_tool_names))
     reprompts = 0

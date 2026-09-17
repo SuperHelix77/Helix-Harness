@@ -37,6 +37,12 @@ def run_closed_loop(
     if audit is None:
         audit = fallback_self_audit(traj, cache, evidence, model_id=model_id)
     quality = build_quality_vector(traj, cache, evidence, audit)
+    extras = traj.extras if isinstance(traj.extras, dict) else {}
+    control_events = (
+        extras.get("tool_control_events")
+        if isinstance(extras.get("tool_control_events"), list)
+        else []
+    )
 
     labels = classify_step_deficits(traj)
     concrete_pattern: list[str] = []
@@ -49,6 +55,17 @@ def run_closed_loop(
     for item in cache.disruptions:
         if not item.necessary:
             concrete_pattern.append(f"cache:{item.cause.value}:{item.action}")
+    # Controller no-ops are backend-observed model actions, unlike self-audit
+    # prose.  They may therefore contribute to recurrence without pretending a
+    # prevented call executed or consumed tool-result cost.
+    for item in control_events:
+        if not isinstance(item, dict):
+            continue
+        action = str(item.get("action") or "")
+        if action in {"duplicate", "equivalent_duplicate", "repeated_failure"}:
+            concrete_pattern.append(
+                f"tool_control:{action}:{str(item.get('tool_name') or 'unknown')[:120]}"
+            )
     # Self-audit and legacy correction prose annotate the record but never create
     # recurrence by themselves.  The legacy Correction schema has no independent
     # verifier bit, so counting it here would turn model/user prose into objective
@@ -78,7 +95,6 @@ def run_closed_loop(
     adaptation.pattern_fingerprint = fingerprint
     adaptation.source_trajectory_ids = recurrence_ids
 
-    extras = traj.extras if isinstance(traj.extras, dict) else {}
     target_receipt = validated_training_target_receipt(
         extras.get("verified_training_target_receipt"),
         trajectory_id=trajectory_id,
@@ -124,6 +140,7 @@ def run_closed_loop(
         "high_impact_claim": any("speed" in item.claim.lower() or "5x" in item.claim.lower() for item in evidence),
         "recurrence_count": recurrence,
         "redundant_tool_calls": objective_redundant_tool_calls,
+        "prevented_tool_calls": len(control_events),
         "cache_reuse_ratio": cache.cache_reuse_ratio,
         "behavior_gap": bool(labels),
         "evidence_supported": not adaptation.rejected_claim_ids,

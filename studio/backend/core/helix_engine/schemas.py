@@ -10,6 +10,7 @@ from typing import Any, Optional
 SCHEMA_VERSION = "helix.adaptive.v1"
 TRAJECTORY_SCHEMA_VERSION = "helix.trajectory.v1"
 COUNTERFACTUAL_SCHEMA_VERSION = "helix.counterfactual.v1"
+TOOL_CONTROL_SCHEMA_VERSION = "helix.tool-control.v1"
 
 
 class CacheCause(str, Enum):
@@ -122,6 +123,21 @@ class CacheIntegrityReport(WireRecord):
 
 
 @dataclass
+class ToolControlEvent(WireRecord):
+    """A tool-loop action prevented before execution; never a fake ToolStep."""
+
+    schema_version: str = TOOL_CONTROL_SCHEMA_VERSION
+    action: str = ""
+    tool_name: str = ""
+    arguments: str = ""
+    reason: str = ""
+    equivalent_to: str = ""
+    failed_attempts: int = 0
+    progress: dict[str, Any] = field(default_factory=dict)
+    provenance: str = "runtime_tool_loop"
+
+
+@dataclass
 class TrajectoryRecord(WireRecord):
     """Versioned observable trajectory envelope for persistence and audit I/O."""
 
@@ -130,6 +146,7 @@ class TrajectoryRecord(WireRecord):
     objective: str = ""
     presented_context: str = ""
     tool_steps: list[dict[str, Any]] = field(default_factory=list)
+    control_events: list[dict[str, Any]] = field(default_factory=list)
     final_result: str = ""
     acceptance_criteria: list[str] = field(default_factory=list)
     telemetry: dict[str, Any] = field(default_factory=dict)

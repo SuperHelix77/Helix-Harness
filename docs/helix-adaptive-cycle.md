@@ -85,6 +85,23 @@ Every live field now carries provenance or an explicit unavailable marker. The c
 
 Efficiency is secondary to result quality and evidentiary completeness. A mechanically avoidable disruption routes first to a runtime/policy fix, not weight training.
 
+## Foreground agentic loop
+
+Post-task Hermes is not the only efficiency boundary. The three production tool loops (GGUF, native safetensors and external-provider/local-tools) share `ToolLoopController`, which now applies a small set of deterministic online invariants before another expensive action is taken:
+
+- exact successful calls are not re-executed without intervening relevant state change;
+- `search_memory` and `search_conversation`, which are proven read-only aliases over the same conversation-memory implementation, are treated as one equivalence family: after one succeeds, the unused sibling is removed from later tool catalogs and any same-argument alias call that still arrives is suppressed before execution;
+- an exact failed call receives two real retries by default, after which an unchanged fourth attempt is suppressed until the strategy/arguments or relevant workspace state changes;
+- successful `edit_file` output carries a model-only reminder to run relevant verification before claiming completion, while the visible tool result remains exact;
+- bounded `loop_progress` provenance reports executions, failures, suppressions and heuristic post-edit verification state without using hidden reasoning or model self-report.
+- prevented calls are persisted as separate `helix.tool-control.v1` records, so post-task learning can observe attempted waste without inventing a `ToolStep` that never executed.
+
+Forced tool calls are not semantically suppressed. A tool identifier literally requested by the user is also exempt, preserving explicit diagnostic/acceptance workflows that intentionally exercise both aliases. Different retrieval arguments remain distinct. Workspace-changing work reopens stale failed verification commands, preserving the ordinary `test -> edit -> test` development loop. Verification-command detection is telemetry/advice only; it never creates authoritative evidence, which still requires backend-owned typed receipts.
+
+Live capture also records the objective retry index for repeated executions of the same normalized tool/arguments. Optional Helix instrumentation remains fail-open: the safetensors loop feature-detects `helix_turn_id` support on injectable executors rather than making that metadata a tool-execution dependency.
+
+See `docs/helix-agentic-loop-analysis-20260917.md` for the gap analysis, implemented hardening and remaining online-control roadmap.
+
 ## Cheap decision controller and measured calibration
 
 The controller is a typed, advisory allocation layer. The first production cost-saving decision is `DEEP_SELF_AUDIT`: it executes **before** the expensive same-model audit. Trivial low-risk completed turns may use the bounded fallback audit instead; failed tools, explicit acceptance criteria, high-impact claims, and typed verifier evidence force a deep audit. Any controller exception preserves the pre-existing full-audit behavior.

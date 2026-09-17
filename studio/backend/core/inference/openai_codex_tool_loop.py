@@ -36,6 +36,7 @@ class CodexRunContext:
     response_format: dict[str, Any] | None = None
     tool_choice: Any = None
     continue_final_message: bool = False
+    helix_turn_id: str | None = None
 
 
 @dataclass(frozen = True)
@@ -106,6 +107,7 @@ def stream_codex_with_studio_tools(
             model = run.model,
             tool_choice = run.tool_choice,
             continue_final_message = run.continue_final_message,
+            helix_turn_id = run.helix_turn_id,
         ),
         policy = ToolLoopPolicy(
             tools = policy.tools,

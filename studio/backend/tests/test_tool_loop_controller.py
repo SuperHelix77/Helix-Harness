@@ -29,6 +29,7 @@ from core.inference.tool_loop_controller import (
     canonical_tool_call_key,
     coerce_arguments_by_schema,
     coerce_tool_arguments,
+    explicit_user_tool_mentions,
     is_tool_error,
     status_for_tool,
     strip_result_for_model,
@@ -199,6 +200,130 @@ def test_repeated_successful_duplicate_becomes_terminal_after_one_recovery_nudge
     assert controller.active_tools() == []
 
 
+def test_memory_search_alias_with_same_arguments_is_suppressed_before_execution():
+    controller = ToolLoopController(
+        tools = [_tool("search_memory"), _tool("search_conversation"), _tool("web_search")]
+    )
+    memory = controller.prepare_call(
+        _call("search_memory", {"query": "HELIX-FINAL-1709"}, "call_memory")
+    )
+    controller.record_result(memory, "same remembered evidence")
+    assert [
+        tool["function"]["name"] for tool in controller.active_tools()
+    ] == ["search_memory", "web_search"]
+
+    alias = controller.prepare_call(
+        _call("search_conversation", {"query": "HELIX-FINAL-1709"}, "call_alias")
+    )
+    completion = controller.record_noop(alias)
+
+    assert alias.action == "equivalent_duplicate"
+    assert not alias.should_execute
+    assert alias.equivalent_to == "search_memory"
+    assert "equivalent retrieval paths" in completion.model_message()["content"]
+    assert "search_memory" in completion.model_message()["content"]
+    progress = controller.progress_snapshot()
+    assert progress["executed_calls"] == 1
+    assert progress["suppressed_equivalent_duplicates"] == 1
+    assert not progress["force_final_answer"]
+
+    # Equivalence is deliberately argument-exact. A different query may retrieve
+    # different evidence and must still run.
+    different = controller.prepare_call(
+        _call("search_conversation", {"query": "different evidence"}, "call_different")
+    )
+    assert different.action == "execute"
+
+
+def test_control_observer_receives_noop_only_and_cannot_break_the_loop():
+    observed = []
+
+    def observer(decision, progress):
+        observed.append((decision.action, decision.tool_name, dict(progress)))
+
+    controller = ToolLoopController(tools = [_tool("web_search")], control_observer = observer)
+    call = _call("web_search", {"query": "same"})
+    first = controller.prepare_call(call)
+    controller.record_result(first, "evidence")
+    assert observed == []
+
+    duplicate = controller.prepare_call(call)
+    controller.record_noop(duplicate)
+    assert observed[0][0:2] == ("duplicate", "web_search")
+    assert observed[0][2]["suppressed_exact_duplicates"] == 1
+
+    def broken_observer(_decision, _progress):
+        raise RuntimeError("optional observer failed")
+
+    fail_open = ToolLoopController(
+        tools = [_tool("web_search")], control_observer = broken_observer
+    )
+    initial = fail_open.prepare_call(call)
+    fail_open.record_result(initial, "evidence")
+    # The observer runs only on the no-op and its failure is swallowed.
+    fail_open.record_noop(fail_open.prepare_call(call))
+
+
+def test_explicit_forced_alias_is_not_semantically_suppressed():
+    controller = ToolLoopController(
+        tools = [_tool("search_memory"), _tool("search_conversation")]
+    )
+    first = controller.prepare_call(_call("search_memory", {"query": "same"}, "call_a"))
+    controller.record_result(first, "same evidence")
+
+    forced = controller.prepare_call(
+        _call("search_conversation", {"query": "same"}, "call_b"),
+        forced = True,
+    )
+    assert forced.action == "execute"
+
+
+def test_literal_user_request_for_both_aliases_exempts_the_requested_second_call():
+    mentions = explicit_user_tool_mentions(
+        [
+            {
+                "role": "user",
+                "content": "Call search_memory and then search_conversation with the same query.",
+            }
+        ],
+        {"search_memory", "search_conversation"},
+    )
+    assert mentions == {"search_memory", "search_conversation"}
+
+    controller = ToolLoopController(
+        tools = [_tool("search_memory"), _tool("search_conversation")],
+        semantic_dedup_exempt_tools = mentions,
+    )
+    first = controller.prepare_call(_call("search_memory", {"query": "same"}, "call_a"))
+    controller.record_result(first, "same evidence")
+    assert {
+        tool["function"]["name"] for tool in controller.active_tools()
+    } == {"search_memory", "search_conversation"}
+    second = controller.prepare_call(
+        _call("search_conversation", {"query": "same"}, "call_b")
+    )
+    assert second.action == "execute"
+
+
+def test_user_tool_mention_matching_is_identifier_exact():
+    mentions = explicit_user_tool_mentions(
+        [{"role": "user", "content": "Discuss search_memory_extra, not the tool itself."}],
+        {"search_memory"},
+    )
+    assert mentions == set()
+
+    # Historical requests do not leak exemptions into the current turn.
+    current = explicit_user_tool_mentions(
+        [
+            {"role": "user", "content": "Earlier, call search_memory."},
+            {"role": "assistant", "content": "Done."},
+            {"role": "user", "content": "Now answer from what you already know."},
+        ],
+        {"search_memory"},
+    )
+    assert current == set()
+
+
 def test_command_can_run_again_after_a_file_edit():
     controller = ToolLoopController(
         tools = [_tool("terminal"), _tool("edit_file"), _tool("web_search")]
@@ -271,6 +396,98 @@ def test_failed_call_does_not_block_retry():
 
     assert retry.should_execute
     assert retry.action == "execute"
+
+
+def test_exact_call_is_suppressed_after_three_failures_but_strategy_change_remains_available():
+    controller = ToolLoopController(tools = [_tool("web_search"), _tool("python")])
+    failed_call = _call("web_search", {"query": "unstable source"})
+
+    first = controller.prepare_call(failed_call)
+    controller.record_result(first, "Error: temporary failure")
+    retry = controller.prepare_call(failed_call)
+    assert retry.action == "execute"
+    controller.record_result(retry, "Error: temporary failure")
+    retry_two = controller.prepare_call(failed_call)
+    assert retry_two.action == "execute"  # two real retries remain available by default
+    controller.record_result(retry_two, "Error: temporary failure")
+
+    repeated = controller.prepare_call(failed_call)
+    completion = controller.record_noop(repeated)
+    assert repeated.action == "repeated_failure"
+    assert repeated.failed_attempts == 3
+    assert "already failed 3 times" in completion.model_message()["content"]
+    assert not controller.force_final_answer
+
+    changed = controller.prepare_call(_call("web_search", {"query": "different source"}))
+    alternate = controller.prepare_call(_call("python", {"code": "print('fallback')"}))
+    assert changed.action == "execute"
+    assert alternate.action == "execute"
+
+    repeated_again = controller.prepare_call(failed_call)
+    controller.record_noop(repeated_again)
+    assert repeated_again.action == "repeated_failure"
+    assert controller.force_final_answer
+    assert controller.progress_snapshot()["suppressed_repeated_failures"] == 2
+
+
+def test_workspace_change_reopens_an_exact_failed_verification_call():
+    controller = ToolLoopController(tools = [_tool("terminal"), _tool("edit_file")])
+    test_call = _call("terminal", {"command": "pytest -q"})
+
+    controller.record_result(controller.prepare_call(test_call), "Error: one failed")
+    retry = controller.prepare_call(test_call)
+    controller.record_result(retry, "Error: one failed")
+    retry_two = controller.prepare_call(test_call)
+    controller.record_result(retry_two, "Error: one failed")
+    assert controller.prepare_call(test_call).action == "repeated_failure"
+
+    edit = _call(
+        "edit_file",
+        {"path": "app.py", "edits": [{"old_string": "bad", "new_string": "fixed"}]},
+    )
+    controller.record_result(controller.prepare_call(edit), "Edited app.py")
+
+    # The world changed. Re-running the exact test command is now meaningful and
+    # must not inherit the old failure streak.
+    assert controller.prepare_call(test_call).action == "execute"
+
+
+def test_successful_edit_adds_model_only_verification_obligation_and_tracks_targeted_check():
+    controller = ToolLoopController(tools = [_tool("edit_file"), _tool("terminal")])
+    edit = _call(
+        "edit_file",
+        {"path": "app.py", "edits": [{"old_string": "bad", "new_string": "fixed"}]},
+    )
+    completion = controller.record_result(controller.prepare_call(edit), "Edited app.py")
+
+    # The user-facing card is exact; only the next model turn gets the quality nudge.
+    assert completion.tool_end_payload()["result"] == "Edited app.py"
+    assert "Before claiming the task is complete" in completion.model_message()["content"]
+    assert controller.progress_snapshot()["verification_pending"] is True
+    assert controller.progress_snapshot()["verification_runs"] == 0
+
+    # Mere inspection does not erase the obligation.
+    inspect_call = _call("terminal", {"command": "cat app.py"})
+    controller.record_result(controller.prepare_call(inspect_call), "fixed")
+    assert controller.progress_snapshot()["verification_pending"] is True
+
+    verify = _call("terminal", {"command": "pytest -q"})
+    verified = controller.record_result(controller.prepare_call(verify), "12 passed")
+    assert verified.tool_end_event()["provenance"]["loop_progress"]["verification_pending"] is False
+    assert controller.progress_snapshot()["verification_runs"] == 1
+
+
+def test_failed_edit_gets_error_recovery_not_a_false_verification_obligation():
+    controller = ToolLoopController(tools = [_tool("edit_file"), _tool("terminal")])
+    edit = _call(
+        "edit_file",
+        {"path": "app.py", "edits": [{"old_string": "missing", "new_string": "fixed"}]},
+    )
+    completion = controller.record_result(controller.prepare_call(edit), "Error: old_string not found")
+
+    assert TOOL_ERROR_NUDGE in completion.model_message()["content"]
+    assert "Before claiming the task is complete" not in completion.model_message()["content"]
+    assert controller.progress_snapshot()["verification_pending"] is False
 
 
 def test_empty_enabled_tool_list_blocks_all_tool_calls():

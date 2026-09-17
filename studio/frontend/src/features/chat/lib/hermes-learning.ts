@@ -174,6 +174,7 @@ export function helixSelfAuditPrompt(
   const acceptanceCriteria = boundAuditJsonValue(observableArtifacts.acceptance_criteria ?? [], 0);
   const cacheIntegrity = boundAuditJsonValue(observableArtifacts.cache_integrity ?? {}, 0);
   const evidence = boundAuditJsonValue(observableArtifacts.evidence ?? [], 0);
+  const controlEvents = boundAuditJsonValue(observableArtifacts.control_events ?? [], 0);
   const objectiveOutcomeEvidence = boundAuditJsonValue(
     observableArtifacts.objective_outcome_evidence ?? [],
     0,
@@ -203,6 +204,7 @@ export function helixSelfAuditPrompt(
     telemetry,
     cache_integrity: cacheIntegrity,
     evidence,
+    control_events: controlEvents,
     objective_outcome_evidence: objectiveOutcomeEvidence,
     edits,
     tests,
@@ -220,6 +222,9 @@ export function helixSelfAuditPrompt(
       acceptance_criteria: acceptanceCriteria,
       telemetry: summarizeAuditTelemetry(observableArtifacts.telemetry),
       cache_integrity: boundAuditJsonValue(observableArtifacts.cache_integrity ?? {}, 1),
+      control_events: Array.isArray(observableArtifacts.control_events)
+        ? boundAuditJsonValue(observableArtifacts.control_events.slice(-16), 1)
+        : controlEvents,
       evidence: Array.isArray(observableArtifacts.evidence)
         ? boundAuditJsonValue(observableArtifacts.evidence.slice(0, 12), 1)
         : evidence,
@@ -241,6 +246,9 @@ export function helixSelfAuditPrompt(
       final_result: finalResult.slice(0, 2_000),
       telemetry: { helix_artifact_compaction: "telemetry_omitted_for_size" },
       cache_integrity: boundAuditJsonValue(observableArtifacts.cache_integrity ?? {}, 2),
+      control_events: Array.isArray(observableArtifacts.control_events)
+        ? boundAuditJsonValue(observableArtifacts.control_events.slice(-8), 2)
+        : [],
       evidence: Array.isArray(observableArtifacts.evidence)
         ? boundAuditJsonValue(observableArtifacts.evidence.slice(0, 6), 2)
         : [],

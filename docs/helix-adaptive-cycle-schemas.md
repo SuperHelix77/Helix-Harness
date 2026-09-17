@@ -8,6 +8,7 @@ Verified training target: `helix.training-target-receipt.v1`
 Managed backend contract: `helix.adaptive.backend.v1`
 Trajectory wire record: `helix.trajectory.v1`
 Counterfactual candidate: `helix.counterfactual.v1`
+Tool-control event: `helix.tool-control.v1`
 Audit preparation: `helix.audit-preparation.v1`
 Audit input: `helix.audit-input.v1`
 Decision calibration: `helix.decision-calibration.v1`
@@ -42,9 +43,17 @@ The `reasoning` field must contain only explicitly supplied/observable reasoning
 
 Version: `helix.trajectory.v1`.
 
-Fields: `trajectory_id`, `objective`, `presented_context`, `tool_steps`, `final_result`, `acceptance_criteria`, `telemetry`, `verified`, `objective_verified`, `latency_ms`, `prompt_tokens`, `completion_tokens`, `model_id`.
+Fields: `trajectory_id`, `objective`, `presented_context`, `tool_steps`, `control_events`, `final_result`, `acceptance_criteria`, `telemetry`, `verified`, `objective_verified`, `latency_ms`, `prompt_tokens`, `completion_tokens`, `model_id`.
 
 This is the persistence/audit wire envelope for an internal `Trajectory`. It intentionally has **no reasoning field**. `verified` preserves the legacy pipeline meaning that the tool-loop/critic completed fully; it is not objective proof. `objective_verified` is the separate backend-resolved outcome-verification bit used by evidence/quality logic. Internal execution code keeps using the established dataclass so the wire-versioning requirement does not introduce a hot-path compatibility dependency.
+
+### `ToolControlEvent`
+
+Version: `helix.tool-control.v1`.
+
+Fields: `action`, `tool_name`, `arguments`, `reason`, `equivalent_to`, `failed_attempts`, `progress`, `provenance`.
+
+This record means the runtime observed a model-requested action and prevented it **before execution**. It is deliberately separate from `ToolStep`: an exact/semantic duplicate, repeated unchanged failure, disabled call, forced-choice mismatch, or spent one-shot tool must never be persisted as though the tool actually ran. Arguments/reason/progress are bounded, and observer failure is swallowed so this telemetry cannot become an execution dependency.
 
 ### `CacheDisruption`
 
@@ -110,7 +119,7 @@ Fields: `available`, `perform_deep_audit`, `decision`, `artifacts`; fail-open pr
 
 Version: `helix.audit-input.v1`.
 
-The backend-resolved observable bundle contains the versioned trajectory envelope, objective, presented context, bounded tool steps, edits, typed tests and benchmarks, final result, acceptance criteria, cache-integrity report, backend-resolved evidence, objective outcome evidence, prompt/completion/latency values, the pre-audit decision, and deterministic deep-audit force reasons. Hidden/private reasoning is intentionally absent.
+The backend-resolved observable bundle contains the versioned trajectory envelope, objective, presented context, bounded tool steps, bounded tool-control events, edits, typed tests and benchmarks, final result, acceptance criteria, cache-integrity report, backend-resolved evidence, objective outcome evidence, prompt/completion/latency values, the pre-audit decision, and deterministic deep-audit force reasons. Hidden/private reasoning is intentionally absent.
 
 The frontend self-audit parser accepts the canonical closed tag. It also tolerates one narrow local-model failure mode: an opening `<helix-self-audit>` followed by exactly one complete JSON object and whitespace with no closing tag. Partial JSON and trailing prose remain invalid. Model-authored top-level string arrays are capped at four items, claims at eight objects, and each claim evidence array at four strings; non-string entries are dropped rather than being promoted into typed evidence.
 

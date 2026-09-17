@@ -317,7 +317,9 @@ def session_trace(
 ) -> dict[str, Any]:
     from core.helix_engine.capture import (
         capture_session_key,
+        latest_session_control_events,
         latest_session_steps,
+        session_control_events,
         session_steps,
     )
 
@@ -325,6 +327,11 @@ def session_trace(
     from core.helix_engine.evidence import tool_verification_receipt
 
     steps = session_steps(key) if turn_id else latest_session_steps(session_id, thread_id)
+    control_events = (
+        session_control_events(key)
+        if turn_id
+        else latest_session_control_events(session_id, thread_id)
+    )
     payload_steps = []
     for index, step in enumerate(steps):
         evidence_ids = [f"tool:{index}:error" if step.error else f"tool:{index}:result"]
@@ -342,7 +349,11 @@ def session_trace(
                 "retry": step.retry,
             }
         )
-    return {"session_id": key, "steps": payload_steps}
+    return {
+        "session_id": key,
+        "steps": payload_steps,
+        "control_events": [event.to_dict() for event in control_events[-200:]],
+    }
 
 
 @router.get("/hub/local")

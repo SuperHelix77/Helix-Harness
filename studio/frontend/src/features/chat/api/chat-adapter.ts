@@ -352,7 +352,7 @@ function scheduleSelfReflect(input: SelfReflectInput): void {
   void (async () => {
     try {
       const captureSessionId = input.sessionId || input.threadId || "default";
-      let trace: { steps?: unknown[] } = {};
+      let trace: { steps?: unknown[]; control_events?: unknown[] } = {};
       try {
         const traceParams = new URLSearchParams();
         if (input.threadId) traceParams.set("thread_id", input.threadId);
@@ -361,7 +361,9 @@ function scheduleSelfReflect(input: SelfReflectInput): void {
         const traceResponse = await authFetch(
           `/api/helix-engine/session/${encodeURIComponent(captureSessionId)}${traceQuery ? `?${traceQuery}` : ""}`,
         );
-        if (traceResponse.ok) trace = (await traceResponse.json()) as { steps?: unknown[] };
+        if (traceResponse.ok) {
+          trace = (await traceResponse.json()) as { steps?: unknown[]; control_events?: unknown[] };
+        }
       } catch {
         // Tool trace is useful evidence, never a prerequisite for the audit.
       }
@@ -371,6 +373,7 @@ function scheduleSelfReflect(input: SelfReflectInput): void {
         // Keep cheap objective telemetry ahead of potentially large tool receipts.
         telemetry: input.telemetry ?? {},
         tool_steps: Array.isArray(trace.steps) ? trace.steps.slice(-16) : [],
+        control_events: Array.isArray(trace.control_events) ? trace.control_events.slice(-16) : [],
       };
       const effectiveModelId = `${input.checkpoint}::adapter=${
         input.useAdapter === true ? "enabled" : input.useAdapter === false ? "disabled" : "unspecified"

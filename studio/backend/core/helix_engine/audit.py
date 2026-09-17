@@ -88,6 +88,7 @@ def observable_audit_payload(
         "objective": record.objective[:4_000],
         "presented_context": record.presented_context[:8_000],
         "tool_steps": record.tool_steps[-100:],
+        "control_events": record.control_events[-100:],
         "edits": edits[-32:],
         "tests": tests[-32:],
         "benchmarks": benchmarks[-32:],
@@ -122,6 +123,11 @@ def prepare_observable_self_audit(
 
     extras = traj.extras if isinstance(traj.extras, dict) else {}
     telemetry = extras.get("telemetry") if isinstance(extras.get("telemetry"), dict) else {}
+    control_events = (
+        extras.get("tool_control_events")
+        if isinstance(extras.get("tool_control_events"), list)
+        else []
+    )
     trajectory_id = str(extras.get("trajectory_id") or "")
     cache = build_cache_integrity_report(telemetry, traj.steps)
     discovered_claims = discover_important_claims(traj, claims)
@@ -134,7 +140,7 @@ def prepare_observable_self_audit(
         for token in ("speed", "throughput", "5x", "security", "correctness")
     )
     criteria = extras.get("acceptance_criteria") if isinstance(extras.get("acceptance_criteria"), list) else []
-    meaningful = bool(traj.steps or criteria or high_impact)
+    meaningful = bool(traj.steps or control_events or criteria or high_impact)
     features = {
         "missing_evidence_count": missing,
         "contradiction_count": contradictions,
@@ -142,6 +148,7 @@ def prepare_observable_self_audit(
         "meaningful_task": meaningful,
         "high_impact_claim": high_impact,
         "tool_calls": len(traj.steps),
+        "tool_control_suppressions": len(control_events),
         "failed_tool": any(step.error for step in traj.steps),
         "acceptance_criteria_count": len(criteria),
     }
@@ -184,7 +191,20 @@ def fallback_self_audit(
     *,
     model_id: str = "",
 ) -> SelfAuditReport:
+    extras = traj.extras if isinstance(traj.extras, dict) else {}
+    control_events = (
+        extras.get("tool_control_events")
+        if isinstance(extras.get("tool_control_events"), list)
+        else []
+    )
     redundant = [f"{step.name}: repeated/redundant call" for step in traj.steps if step.useful_hint == "redundant"]
+    prevented = [
+        f"{str(item.get('tool_name') or 'tool')}: prevented {str(item.get('action') or 'controller no-op')}"
+        for item in control_events
+        if isinstance(item, dict)
+        and item.get("action") in {"duplicate", "equivalent_duplicate", "repeated_failure"}
+    ]
+    unnecessary = redundant + prevented
     failures = [f"{step.name}: {step.error}" for step in traj.steps if step.error]
     unsupported = [item.claim for item in evidence if item.status.value in {"UNVERIFIED", "CONTRADICTED"}]
     return SelfAuditReport(
@@ -195,15 +215,15 @@ def fallback_self_audit(
             else None
         ),
         contributing_actions=[step.name for step in traj.steps if step.useful_hint in {"useful", "evidence"}][:32],
-        unnecessary_actions=redundant[:32],
+        unnecessary_actions=unnecessary[:32],
         failures=failures[:32],
-        excess_retrieval=[item for item in redundant if "read" in item.lower() or "search" in item.lower()][:32],
+        excess_retrieval=[item for item in unnecessary if "read" in item.lower() or "search" in item.lower()][:32],
         avoidable_cache_disruption=[item.action for item in cache.disruptions if not item.necessary][:32],
         tool_selection_correct=False if failures else None,
         overclaimed_claims=unsupported[:32],
-        continued_too_long=bool(redundant),
-        better_trajectory=["retain only credited non-redundant actions"] if redundant else [],
-        recommendation=AdaptationKind.RUNTIME_POLICY if redundant else AdaptationKind.IGNORE,
+        continued_too_long=bool(unnecessary),
+        better_trajectory=["retain only credited non-redundant actions"] if unnecessary else [],
+        recommendation=AdaptationKind.RUNTIME_POLICY if unnecessary else AdaptationKind.IGNORE,
         recommendation_reason="deterministic fallback derived from observable trajectory; model audit unavailable",
         self_assessment_confidence=0.0,
         model_id=model_id,

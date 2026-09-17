@@ -448,6 +448,8 @@ from core.inference.tool_loop_controller import (
     append_deferred_nudges,
     awaiting_approval_status,
     deferred_nudge_text,
+    explicit_user_tool_mentions,
+    make_optional_helix_control_observer,
     provisional_tool_provenance,
 )
 from state.tool_approvals import (
@@ -32389,6 +32391,12 @@ class LlamaCppBackend:
         tool_controller = ToolLoopController(
             tools = controller_tools,
             auto_heal_tool_calls = auto_heal_tool_calls,
+            control_observer = make_optional_helix_control_observer(
+                session_id, thread_id, helix_turn_id
+            ),
+            semantic_dedup_exempt_tools = explicit_user_tool_mentions(
+                messages, {"search_memory", "search_conversation"}
+            ),
         )
 
         def _tool_succeeded(tool_name: str) -> bool:

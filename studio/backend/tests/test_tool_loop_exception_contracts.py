@@ -239,17 +239,23 @@ def test_a_repeated_failing_call_stays_bounded(monkeypatch):
         max_calls = max_calls,
     )
 
-    assert len(executions) <= max_calls, (
-        f"the loop ran the same failing call {len(executions)} times "
-        f"with a budget of {max_calls}"
-    )
+    # The shared controller now stops an unchanged call after the initial
+    # execution plus two real retries, before a larger request budget is spent.
+    assert len(executions) == 3, executions
+    assert len(executions) < max_calls
     ends = studio_h._events(lines, "tool_end")
     assert ends, "no tool_end at all"
-    # Every execution reports the real error; the trailing card is the
-    # controller's budget notice, which is how the loop says it stopped.
+    # Every real execution reports the actual error; the trailing card is the
+    # controller's pre-execution repeated-failure stop, not a fabricated tool
+    # result and not a fourth failing execution.
     executed_ends = [e for e in ends if REAL_ERROR in e["result"]]
     assert len(executed_ends) == len(executions), [e["result"] for e in ends]
-    assert "limit was reached" in ends[-1]["result"], ends[-1]["result"]
+    assert "exact same attempt had already failed repeatedly" in ends[-1]["result"]
+    assert ends[-1]["provenance"]["controller_action"] == "repeated_failure"
+    # First suppression gives the model one chance to change strategy; repeating
+    # the blocked request a second time triggers the existing force-final path.
+    assert ends[-1]["provenance"]["loop_progress"]["suppressed_repeated_failures"] == 2
+    assert ends[-1]["provenance"]["loop_progress"]["force_final_answer"] is True
     assert not any("Unknown tool" in e["result"] for e in ends)
     assert transport.turns, "the loop consumed every scripted turn instead of stopping"
 

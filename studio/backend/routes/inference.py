@@ -21564,6 +21564,11 @@ async def _proxy_to_external_provider(
                 response_format = _extract_response_format(payload),
                 tool_choice = payload.tool_choice,
                 continue_final_message = _continue_final_message(payload),
+                # External/Codex branches do not mint the local completion id at
+                # this point.  Use the UI's real turn/cancel id when supplied;
+                # otherwise leave optional Helix control capture disabled rather
+                # than inventing an id the later ingest path cannot join.
+                helix_turn_id = payload.cancel_id,
             )
             policy = (
                 CodexToolPolicy(
@@ -21929,6 +21934,7 @@ async def _proxy_to_external_provider(
                     model = model,
                     tool_choice = payload.tool_choice,
                     continue_final_message = _continue_final_message(payload),
+                    helix_turn_id = payload.cancel_id,
                 ),
                 policy = ToolLoopPolicy(
                     tools = external_studio_tools,

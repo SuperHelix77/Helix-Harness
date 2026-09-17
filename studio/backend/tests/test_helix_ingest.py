@@ -9,12 +9,15 @@ from fastapi import BackgroundTasks
 from core.helix_engine.capture import (
     capture_session_key,
     clear_session,
+    record_tool_control_event,
     record_tool_execution,
+    session_control_events,
     session_steps,
+    trajectory_from_session,
 )
 from core.helix_engine.critic import critic_from_steps, parse_self_critic
 from core.helix_engine.ingest import ingest_turn
-from core.helix_engine.trajectory import ToolStep, Trajectory
+from core.helix_engine.trajectory import ToolStep, Trajectory, trajectory_record
 from core.helix_engine.routing import route_adaptation
 from core.helix_engine.training_targets import (
     issue_verified_training_target_receipt,
@@ -104,6 +107,50 @@ def test_deterministic_critic_flags_redundant_tool_spam():
     critic = critic_from_steps(steps, finished="partial")
     assert critic.too_many_tools is True
     assert critic.recommendation == "skill"
+
+
+def test_live_capture_records_objective_retry_index_for_same_execution():
+    key = "retry-capture"
+    clear_session(key)
+    first = record_tool_execution(key, "web_search", {"query": "x"}, "Error: temporary")
+    second = record_tool_execution(key, "web_search", {"query": "x"}, "Error: temporary")
+    changed = record_tool_execution(key, "web_search", {"query": "y"}, "ok")
+
+    assert first.retry == 0
+    assert second.retry == 1
+    assert changed.retry == 0
+    assert [step.retry for step in session_steps(key)] == [0, 1, 0]
+
+
+def test_prevented_tool_call_is_a_versioned_control_event_not_a_fake_tool_step():
+    key = capture_session_key("control-session", "thread", "turn-1")
+    clear_session(key)
+    event = record_tool_control_event(
+        key,
+        action="equivalent_duplicate",
+        tool_name="search_conversation",
+        arguments={"query": "same"},
+        reason="search_memory already completed the equivalent retrieval",
+        equivalent_to="search_memory",
+        progress={"executed_calls": 1, "suppressed_equivalent_duplicates": 1},
+    )
+
+    assert event.schema_version == "helix.tool-control.v1"
+    assert session_steps(key) == []
+    assert session_control_events(key)[0].action == "equivalent_duplicate"
+
+    traj = trajectory_from_session(
+        key,
+        prompt_state="retrieve same memory once",
+        final_result="done",
+        verified=False,
+        extras={"trajectory_id": "turn-1", "objective_verified": False},
+    )
+    record = trajectory_record(traj)
+    assert record.tool_steps == []
+    assert len(record.control_events) == 1
+    assert record.control_events[0]["schema_version"] == "helix.tool-control.v1"
+    assert record.control_events[0]["equivalent_to"] == "search_memory"
 
 
 def test_ingest_turn_stages_hermes_skill_and_never_auto_qlora(tmp_path, monkeypatch):

@@ -104,11 +104,17 @@ def trajectory_record(traj: Trajectory):
         })
     telemetry = extras.get("telemetry") if isinstance(extras.get("telemetry"), dict) else {}
     criteria = extras.get("acceptance_criteria") if isinstance(extras.get("acceptance_criteria"), list) else []
+    control_events = (
+        extras.get("tool_control_events")
+        if isinstance(extras.get("tool_control_events"), list)
+        else []
+    )
     return TrajectoryRecord(
         trajectory_id=str(extras.get("trajectory_id") or ""),
         objective=traj.prompt_state[:8_000],
         presented_context=traj.retrieved_context[:16_000],
         tool_steps=steps,
+        control_events=[dict(item) for item in control_events[:200] if isinstance(item, dict)],
         final_result=traj.final_result[:16_000],
         acceptance_criteria=[str(item)[:1_000] for item in criteria[:64]],
         telemetry=dict(telemetry),

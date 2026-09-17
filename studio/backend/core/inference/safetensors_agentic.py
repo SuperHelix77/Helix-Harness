@@ -59,6 +59,8 @@ from core.inference.tool_loop_controller import (
     append_deferred_nudges,
     awaiting_approval_status,
     coerce_tool_arguments,
+    explicit_user_tool_mentions,
+    make_optional_helix_control_observer,
     status_for_tool,
     tool_event_provenance,
 )
@@ -685,6 +687,12 @@ def run_safetensors_tool_loop(
     tool_controller = ToolLoopController(
         tools = (None if unrestricted_tools else _authorized),
         auto_heal_tool_calls = auto_heal_tool_calls,
+        control_observer = make_optional_helix_control_observer(
+            session_id, thread_id, helix_turn_id
+        ),
+        semantic_dedup_exempt_tools = explicit_user_tool_mentions(
+            messages, {"search_memory", "search_conversation"}
+        ),
     )
     # RAG: cap knowledge-base searches per assistant turn (controller-agnostic).
     kb_search_count = 0
@@ -1479,8 +1487,13 @@ def run_safetensors_tool_loop(
                         thread_id = thread_id,
                         rag_scope = rag_scope,
                         disable_sandbox = bypass_permissions,
-                        helix_turn_id = helix_turn_id,
                     )
+                    # `execute_tool` is injectable on this path.  Helix capture is
+                    # optional instrumentation, so forwarding its turn id must obey
+                    # the same compatibility rule as every other optional execution
+                    # kwarg instead of breaking otherwise-valid tool executors/fakes.
+                    if _accepts_kwarg(execute_tool, "helix_turn_id"):
+                        kwargs["helix_turn_id"] = helix_turn_id
                     if _accepts_kwarg(execute_tool, "conversation_branch"):
                         kwargs["conversation_branch"] = request_branch
                     # And the room the model has left, as the GGUF loop does: without a

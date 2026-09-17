@@ -43,6 +43,12 @@ Managed runtime is Unsloth `2026.9.5`; Mem0 is `2.0.20`. The completion overlay 
 - Verifier authority is backend-owned typed metadata, never command/tool strings.
 - Passed verifier evidence must be exactly claim-bound.
 - Unsupported `>=5x` acceptance claim was `UNVERIFIED` and could not trigger QLoRA.
+- The shared foreground `ToolLoopController` now suppresses the proven `search_memory` / `search_conversation` semantic-alias duplicate before a second identical retrieval executes, while different queries and forced calls still run.
+- Exact failures get two real retries by default; an unchanged fourth attempt is suppressed until arguments/strategy or relevant workspace state changes. This prevents failure loops without treating one transient error as terminal.
+- Successful `edit_file` results give only the model a verification reminder; visible tool results remain exact. Loop provenance exposes bounded objective progress counters and heuristic verification-pending state without turning those counters into verifier authority.
+- Prevented foreground actions are persisted separately as versioned `helix.tool-control.v1` events when a Helix turn id exists; they never masquerade as executed `ToolStep`s, but can contribute objective recurrence evidence.
+- Live Helix capture now records real retry indices instead of leaving every `ToolStep.retry` at zero.
+- Safetensors optional `helix_turn_id` metadata is feature-detected on injectable executors, preserving the fail-open instrumentation boundary.
 
 ### Hermes / adaptive cycle
 
@@ -89,11 +95,14 @@ Managed runtime is Unsloth `2026.9.5`; Mem0 is `2.0.20`. The completion overlay 
 
 ## Current checks
 
-- Final adaptive/ingest/pipeline/engine/routes/self-training/UI-policy backend suite: **134 passed**.
+- Final adaptive/ingest/pipeline/engine/routes/self-training/UI-policy backend suite: **136 passed**.
+- Final shared-controller + external Studio loop slice: **106 passed**.
+- Final external hosted/local-tool selection + exception-contract + focused Codex slice: **98 passed**.
+- Final GGUF no-progress slice: **12 passed**.
 - Final focused frontend Hermes/context/Engine/timeout/route suite: **28 passed**.
 - Frontend TypeScript typecheck: **PASS**.
 - Frontend production build: **PASS**; only the established `::highlight`, dynamic-import and chunk-size warnings remain.
-- Ruff across **20** modified/untracked Python files: **PASS**.
+- Ruff across the agentic-pass modified Python files: **PASS**.
 - `git diff --check`: **PASS**.
 - Completion-source macOS app rebuild: **PASS** (`ai.helix.harness.v2`, arm64, version `1.1.0`).
 - Embedded completion overlay: **639 files**, SHA-256 `5fc6075a4b5fe62581b51dbf8c8fbbf2d90c6d33df747f10dd1081c9312f132e`; no tests/bytecode/backend requirements.
@@ -106,6 +115,8 @@ These source-completion and packaging checks establish that the installed v2 app
 Full historical v2 acceptance details are in `docs/helix-harness-v2-validation-20260916.md`.
 
 The original Jev/Empryo/self-audit → Hermes plan was re-audited on 2026-09-17 and its concrete gaps were then implemented. See `docs/helix-adaptive-cycle-conformance-20260917.md` for the historical gap audit and `docs/helix-adaptive-cycle-acceptance-20260917.md` for the completion acceptance/overhead evidence. Decision calibration has begun and is measured, but is not statistically mature and is not described as calibrated. Counterfactual equivalence verification remains intentionally absent rather than being guessed from self-report.
+
+Foreground-agent hardening and the remaining online-control gaps are documented in `docs/helix-agentic-loop-analysis-20260917.md`.
 
 ## Remaining evidence boundaries
 
