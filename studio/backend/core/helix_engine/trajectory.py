@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 
 class VerificationKind(str, Enum):
@@ -73,3 +73,49 @@ class Trajectory:
     dataset_hash: str = ""
     adapter_version: str = ""
     extras: dict = field(default_factory=dict)
+
+
+def trajectory_record(traj: Trajectory):
+    """Return a versioned observable wire record; hidden reasoning is excluded."""
+    from .schemas import TrajectoryRecord
+
+    extras = traj.extras if isinstance(traj.extras, dict) else {}
+    steps: list[dict[str, Any]] = []
+    for index, step in enumerate(traj.steps[-200:]):
+        verification = None
+        if step.verification is not None:
+            verification = {
+                "kind": step.verification.kind.value,
+                "status": step.verification.status.value,
+                "provenance": step.verification.provenance,
+                "detail": step.verification.detail,
+                "claim": step.verification.claim,
+                "subject": step.verification.subject,
+            }
+        steps.append({
+            "index": index,
+            "name": step.name,
+            "arguments": step.arguments,
+            "result": step.result,
+            "useful_hint": step.useful_hint,
+            "error": step.error,
+            "retry": step.retry,
+            "verification": verification,
+        })
+    telemetry = extras.get("telemetry") if isinstance(extras.get("telemetry"), dict) else {}
+    criteria = extras.get("acceptance_criteria") if isinstance(extras.get("acceptance_criteria"), list) else []
+    return TrajectoryRecord(
+        trajectory_id=str(extras.get("trajectory_id") or ""),
+        objective=traj.prompt_state[:8_000],
+        presented_context=traj.retrieved_context[:16_000],
+        tool_steps=steps,
+        final_result=traj.final_result[:16_000],
+        acceptance_criteria=[str(item)[:1_000] for item in criteria[:64]],
+        telemetry=dict(telemetry),
+        verified=bool(traj.verified),
+        objective_verified=extras.get("objective_verified") is True,
+        latency_ms=max(0.0, float(traj.latency_ms or 0.0)),
+        prompt_tokens=max(0, int(traj.prompt_tokens or 0)),
+        completion_tokens=max(0, int(traj.completion_tokens or 0)),
+        model_id=str(extras.get("model_id") or "")[:500],
+    )

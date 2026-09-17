@@ -182,6 +182,52 @@ def decision_calibration() -> dict[str, Any]:
     return calibration_summary()
 
 
+@router.post("/prepare-audit")
+def prepare_completed_turn_audit(payload: IngestTurnIn) -> dict[str, Any]:
+    """Build backend-resolved observable artifacts before generative self-audit.
+
+    This endpoint is deliberately fail-open. The caller's pre-existing behavior
+    was to run the deep audit, so any optional Helix failure returns that choice.
+    """
+    try:
+        from core.helix_engine.audit import prepare_observable_self_audit
+        from core.helix_engine.capture import capture_session_key, trajectory_from_session
+
+        key = capture_session_key(payload.session_id, payload.thread_id, payload.turn_id)
+        telemetry = payload.telemetry if isinstance(payload.telemetry, dict) else {}
+        trajectory_id = str(payload.turn_id or telemetry.get("trajectory_id") or "")
+        behavioral_model_id = str(payload.effective_model_id or payload.model_id or "").strip()
+        traj = trajectory_from_session(
+            key,
+            prompt_state=payload.prompt,
+            final_result=payload.final_result,
+            latency_ms=float(telemetry.get("latency_ms") or 0),
+            prompt_tokens=int(telemetry.get("prompt_tokens") or telemetry.get("promptTokens") or 0),
+            completion_tokens=int(telemetry.get("completion_tokens") or telemetry.get("completionTokens") or 0),
+            verified=telemetry.get("objective_verified") is True,
+            extras={
+                "telemetry": telemetry,
+                "acceptance_criteria": list(payload.acceptance_criteria or []),
+                "model_id": behavioral_model_id,
+                "base_model_id": payload.model_id,
+                "adapter_state": payload.adapter_state,
+                "objective_verified": telemetry.get("objective_verified") is True,
+                "trajectory_id": trajectory_id,
+                "thread_id": payload.thread_id,
+                "capture_session_id": key,
+            },
+        )
+        return prepare_observable_self_audit(traj, claims=payload.claims)
+    except BaseException as exc:
+        return {
+            "schema_version": "helix.audit-preparation.v1",
+            "available": False,
+            "perform_deep_audit": True,
+            "fail_open": True,
+            "error": f"{type(exc).__name__}: {exc}"[:500],
+        }
+
+
 @router.post("/ingest-turn")
 def ingest_completed_turn(
     payload: IngestTurnIn,

@@ -12,6 +12,27 @@ from .schemas import CacheIntegrityReport, EvidenceClaim, EvidenceStatus
 from .trajectory import Trajectory
 
 _SPEED_RE = re.compile(r"(?:\b5\s*[x×]\b|five\s+times|speed|throughput|tok(?:en)?s?/s)", re.I)
+_IMPORTANT_CLAIM_RE = re.compile(
+    r"(?:"
+    r"\b\d+(?:\.\d+)?\s*[x×]\b|"
+    r"\bfaster\b|\bslower\b|\bspeed\b|\bthroughput\b|\blatency\b|\btok(?:en)?s?/s\b|"
+    r"\btests?\s+(?:pass(?:ed)?|succeed(?:ed)?)\b|"
+    r"\b(?:build|typecheck|lint|benchmark)\s+(?:pass(?:ed)?|succeed(?:ed)?)\b|"
+    r"\b(?:implemented|fixed|resolved|verified|correct|secure)\b"
+    r")",
+    re.I,
+)
+_PERFORMANCE_CLAIM_RE = re.compile(
+    r"(?:\b\d+(?:\.\d+)?\s*[x×]\b|\bfaster\b|\bslower\b|\bspeed\b|"
+    r"\bthroughput\b|\blatency\b|\btok(?:en)?s?/s\b)",
+    re.I,
+)
+_UNCERTAINTY_RE = re.compile(
+    r"(?:\bunverified\b|\bunknown\b|\bnot\s+(?:verified|tested|measured|demonstrated|proven|implemented|fixed|resolved|correct|secure)\b|"
+    r"\bno\s+(?:benchmark|evidence|measurement)\b|\bcannot\s+claim\b|\bcan't\s+claim\b|"
+    r"\bdid\s+not\b|\bdoes\s+not\b|\bnot\s+(?:pass|passed|fixed|resolved|correct|secure)\b)",
+    re.I,
+)
 
 
 @dataclass(frozen=True)
@@ -81,6 +102,70 @@ def _supports_claim(item: _ResolvedEvidence, claim: str) -> bool:
     if not item.authoritative or not item.bound_claim:
         return False
     return _normalized_claim(item.bound_claim) == _normalized_claim(claim)
+
+
+def discover_important_claims(
+    traj: Trajectory,
+    raw_claims: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """Merge explicit claims with bounded claims visible in the final answer.
+
+    This is intentionally conservative. It does not ask a model to extract claims,
+    and it does not convert discovered prose into proof. It merely ensures that
+    obvious high-impact assertions such as performance numbers or "tests passed"
+    enter the evidence graph even when the frontend/model did not volunteer a
+    ``claims`` array. Explicit uncertainty/negative-result sentences are skipped so
+    Helix does not turn honest caveats into positive claims that then need proving.
+    """
+    merged = [dict(item) for item in (raw_claims or []) if isinstance(item, dict)]
+    known = {
+        _normalized_claim(str(item.get("claim") or ""))
+        for item in merged
+        if str(item.get("claim") or "").strip()
+    }
+    text = str(traj.final_result or "")[:12_000]
+    extras = traj.extras if isinstance(traj.extras, dict) else {}
+    objective_verified = extras.get("objective_verified") is True
+    # Line boundaries are retained because engineering final answers often use
+    # bullets without terminal punctuation. Sentence punctuation is a second bound.
+    segments: list[str] = []
+    for line in text.splitlines()[:128]:
+        stripped = re.sub(r"^[\s>*#\-+\d.)]+", "", line).strip()
+        if not stripped:
+            continue
+        pieces = re.split(r"(?<=[.!?])\s+", stripped)
+        segments.extend(piece.strip() for piece in pieces if piece.strip())
+        if len(segments) >= 64:
+            break
+
+    discovered = 0
+    for segment in segments[:64]:
+        claim = segment[:500]
+        if not _IMPORTANT_CLAIM_RE.search(claim) or _UNCERTAINTY_RE.search(claim):
+            continue
+        # A trusted objective verifier already covers generic "implemented/fixed/tests
+        # passed" completion language at the task level. Performance claims remain a
+        # separate evidentiary obligation even on an otherwise verified trajectory.
+        if objective_verified and not _PERFORMANCE_CLAIM_RE.search(claim):
+            continue
+        normalized = _normalized_claim(claim)
+        if not normalized or normalized in known:
+            continue
+        discovered += 1
+        known.add(normalized)
+        merged.append(
+            {
+                "claim_id": f"observable-final-{discovered}",
+                "claim": claim,
+                "confidence": 0.5,
+                "supporting_evidence": [],
+                "evidence_refs": [],
+                "missing_evidence": ["backend-resolved evidence for observable final-answer claim"],
+            }
+        )
+        if discovered >= 12:
+            break
+    return merged
 
 
 def _objective_evidence(traj: Trajectory, cache: CacheIntegrityReport) -> dict[str, _ResolvedEvidence]:
@@ -245,7 +330,10 @@ def build_evidence_claims(
                     claim.contradicting_evidence.append(evidence)
                 else:
                     claim.supporting_evidence.append(evidence)
-        if "5" in claim.claim and cache.accepted_drafts <= 0:
+        accepted_drafts_unavailable = "accepted_drafts" in cache.unavailable_fields
+        if "5" in claim.claim and accepted_drafts_unavailable:
+            claim.missing_evidence.append("request-scoped speculative acceptance evidence")
+        elif "5" in claim.claim and cache.accepted_drafts <= 0:
             if benchmark_present:
                 claim.contradicting_evidence.append("speculative accepted_drafts=0")
             else:

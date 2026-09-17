@@ -7,15 +7,32 @@ import asyncio
 import pytest
 from fastapi import BackgroundTasks
 
-from core.helix_engine.audit import fallback_self_audit, parse_self_audit
+from core.helix_engine.audit import (
+    fallback_self_audit,
+    observable_audit_payload,
+    parse_self_audit,
+    prepare_observable_self_audit,
+)
 from core.helix_engine.cache_integrity import build_cache_integrity_report
-from core.helix_engine.decision_controller import parse_decision_kind, shadow_decision
-from core.helix_engine.evidence import build_evidence_claims, evaluate_claim
+from core.helix_engine.compress import build_counterfactual_candidate
+from core.helix_engine.decision_controller import (
+    calibration_summary,
+    parse_decision_kind,
+    safe_advisory_decision,
+    shadow_decision,
+)
+from core.helix_engine.evidence import build_evidence_claims, discover_important_claims, evaluate_claim
 from core.helix_engine.hermes import adjudicate
 from core.helix_engine.pipeline import run_adaptation_pipeline
 from core.helix_engine.quality import build_quality_vector
-from core.helix_engine.schemas import AdaptationKind, EvidenceStatus, SCHEMA_VERSION
-from core.helix_engine.trajectory import ToolStep, Trajectory
+from core.helix_engine.schemas import (
+    AdaptationKind,
+    DecisionChoice,
+    EvidenceStatus,
+    SCHEMA_VERSION,
+    TRAJECTORY_SCHEMA_VERSION,
+)
+from core.helix_engine.trajectory import ToolStep, Trajectory, trajectory_record
 
 
 def _traj(**overrides) -> Trajectory:
@@ -92,6 +109,48 @@ def test_typed_decisions_reject_unknown_values_and_are_advisory():
     assert decision.to_dict()["decision"] == "RUN_ANOTHER_TEST"
 
 
+def test_decision_controller_failure_falls_back_to_existing_deep_audit_behavior(monkeypatch):
+    from core.helix_engine import decision_controller
+
+    monkeypatch.setattr(
+        decision_controller,
+        "shadow_decision",
+        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("decision backend unavailable")),
+    )
+    decision = safe_advisory_decision(
+        "DEEP_SELF_AUDIT",
+        {"meaningful_task": False},
+        decision_id="fallback-decision",
+        trajectory_id="traj-fallback",
+        fallback_choice=DecisionChoice.TAKE,
+    )
+    assert decision.choice == DecisionChoice.TAKE
+    assert decision.confidence == 0.0
+    assert decision.policy_version == "helix-fallback-v1"
+    assert "decision backend unavailable" in str(decision.evidence_features.get("controller_fallback"))
+
+
+def test_pre_audit_gate_can_skip_trivial_turn_but_forces_meaningful_or_failed_work(tmp_path, monkeypatch):
+    monkeypatch.setenv("HELIX_ENGINE_LEDGER_ROOT", str(tmp_path))
+    trivial = _traj(
+        steps=[],
+        final_result="hello",
+        extras={"trajectory_id": "trivial", "telemetry": {}, "objective_verified": False},
+    )
+    prepared = prepare_observable_self_audit(trivial)
+    assert prepared["perform_deep_audit"] is False
+    assert prepared["decision"]["decision"] == "DEEP_SELF_AUDIT"
+    assert prepared["decision"]["choice"] == "SKIP"
+
+    failed = _traj(
+        steps=[ToolStep(name="run_test", arguments="", result="failed", error="boom")],
+        extras={"trajectory_id": "failed", "telemetry": {}, "objective_verified": False},
+    )
+    prepared_failed = prepare_observable_self_audit(failed)
+    assert prepared_failed["perform_deep_audit"] is True
+    assert "failed_tool" in prepared_failed["artifacts"]["deep_audit_forced_reasons"]
+
+
 def test_evidence_distinguishes_supported_from_unverified_speed_claim():
     unsupported_report = evaluate_claim({"claim": "unit tests pass", "evidence": ["pytest: 12 passed"]})
     assert unsupported_report.status == EvidenceStatus.UNVERIFIED
@@ -106,6 +165,34 @@ def test_evidence_distinguishes_supported_from_unverified_speed_claim():
     speed = build_evidence_claims(traj, cache, [{"claim_id": "speed", "claim": "DFlash achieves 5x speed"}])[0]
     assert speed.status == EvidenceStatus.UNVERIFIED
     assert any("benchmark" in item for item in speed.missing_evidence)
+
+
+def test_backend_discovers_high_impact_final_claim_without_frontend_claim_array():
+    traj = _traj(
+        final_result="The helper is fixed. Helix is at least 5x faster. No benchmark was supplied for another idea.",
+        extras={"trajectory_id": "claim-discovery", "telemetry": {}, "objective_verified": False},
+    )
+    discovered = discover_important_claims(traj)
+    claims = [item["claim"] for item in discovered]
+    assert "The helper is fixed." in claims
+    assert "Helix is at least 5x faster." in claims
+    assert all("No benchmark" not in item for item in claims)
+    cache = build_cache_integrity_report({}, traj.steps)
+    evidence = build_evidence_claims(traj, cache, discovered)
+    speed = next(item for item in evidence if "5x" in item.claim)
+    assert speed.status == EvidenceStatus.UNVERIFIED
+    assert any("benchmark" in item for item in speed.missing_evidence)
+
+
+def test_backend_claim_discovery_does_not_promote_explicit_uncertainty_as_positive_claim():
+    traj = _traj(
+        final_result=(
+            "Performance is not measured. No benchmark was run. "
+            "The fix is not verified. The test did not pass."
+        ),
+        extras={"trajectory_id": "claim-caveat", "telemetry": {}, "objective_verified": False},
+    )
+    assert discover_important_claims(traj) == []
 
 
 def test_single_self_audit_cannot_make_qlora_eligible(tmp_path, monkeypatch):
@@ -205,6 +292,56 @@ def test_cache_report_records_provenance_and_avoidable_repeat():
     assert report.newly_evaluated_tokens == 40
     assert report.cache_reuse_ratio == pytest.approx(0.6)
     assert any(item.cause.value == "MODEL_CAUSED" and not item.necessary for item in report.disruptions)
+    assert report.telemetry_provenance["stable_prefix_tokens"] == "inferred_from_cached_tokens"
+
+
+def test_cache_report_marks_tool_context_reinjection_and_unknown_kv_reset_with_provenance():
+    report = build_cache_integrity_report(
+        {
+            "prompt_tokens": 200,
+            "cached_tokens": 50,
+            "kv_cache_resets": 1,
+            "context_insertions": [
+                {
+                    "kind": "tool_output",
+                    "repeated": True,
+                    "estimated_tokens": 25,
+                    "provenance": "frontend_outbound_tool_history",
+                }
+            ],
+            "telemetry_provenance": {"kv_cache_resets": "runtime_event"},
+        },
+        [],
+    )
+    assert report.kv_cache_resets == 1
+    assert report.repeated_context_insertions == 1
+    reset = next(item for item in report.disruptions if item.action == "kv_cache_reset")
+    assert reset.cause.value == "UNKNOWN"
+    assert reset.provenance == "runtime_event"
+    repeated = next(item for item in report.disruptions if item.action == "repeat_context_insertion:tool_output")
+    assert repeated.cause.value == "TOOL_CAUSED"
+    assert repeated.necessary is False
+
+
+def test_unavailable_runtime_counter_is_not_also_claimed_observable():
+    report = build_cache_integrity_report(
+        {
+            "prompt_tokens": 100,
+            "cached_tokens": 80,
+            "accepted_drafts": 0,
+            "rejected_drafts": 0,
+            "speculative_counter_scope": "unavailable",
+            "telemetry_provenance": {"kv_cache_resets": "unavailable"},
+        },
+        [ToolStep(name="search_memory", arguments="q", result="same")],
+    )
+    assert "kv_cache_resets" in report.unavailable_fields
+    assert "kv_cache_resets" not in report.observable_fields
+    assert "accepted_drafts" in report.unavailable_fields
+    assert "accepted_drafts" not in report.observable_fields
+    assert "rejected_drafts" in report.unavailable_fields
+    assert "context_insertions" in report.observable_fields
+    assert report.context_insertions == ["tool_output:search_memory"]
 
 
 def test_cache_report_treats_search_memory_aliases_as_duplicate_retrieval():
@@ -222,6 +359,30 @@ def test_cache_report_treats_search_memory_aliases_as_duplicate_retrieval():
     ]
 
 
+def test_alias_duplicate_drives_quality_and_counterfactual_even_without_redundant_hint():
+    steps = [
+        ToolStep(name="search_memory", arguments='{"query": "same"}', result="same evidence", useful_hint="useful"),
+        ToolStep(name="search_conversation", arguments='{"query": "same"}', result="same evidence", useful_hint="useful"),
+    ]
+    traj = _traj(steps=steps, extras={"trajectory_id": "alias-cf", "telemetry": {}, "objective_verified": False})
+    cache = build_cache_integrity_report({}, steps)
+    evidence = build_evidence_claims(traj, cache)
+    audit = fallback_self_audit(traj, cache, evidence)
+    quality = build_quality_vector(traj, cache, evidence, audit)
+    candidate = build_counterfactual_candidate(
+        traj,
+        quality=quality,
+        evidence_ids=[item.claim_id for item in evidence],
+    )
+
+    assert quality.raw_metrics["redundant_tool_calls"] == 1
+    assert candidate.actual_tool_calls == 2
+    assert candidate.proposed_tool_calls == 1
+    assert candidate.estimated_tool_calls_saved == 1
+    assert candidate.equivalence_status == EvidenceStatus.UNVERIFIED
+    assert candidate.training_pair_eligible is False
+
+
 def test_self_audit_is_machine_readable_and_versioned():
     audit = parse_self_audit({"objective": "x", "achieved": True, "recommendation": "SKILL"}, model_id="qwen")
     assert audit is not None
@@ -229,6 +390,78 @@ def test_self_audit_is_machine_readable_and_versioned():
     assert payload["schema_version"] == SCHEMA_VERSION
     assert payload["recommendation"] == "SKILL"
     assert payload["model_id"] == "qwen"
+
+
+def test_trajectory_wire_record_is_versioned_and_excludes_hidden_reasoning():
+    record = trajectory_record(_traj())
+    payload = record.to_dict()
+    assert payload["schema_version"] == TRAJECTORY_SCHEMA_VERSION
+    assert payload["trajectory_id"] == "traj-1"
+    assert payload["verified"] is True
+    assert payload["objective_verified"] is True
+    assert "reasoning" not in payload
+    assert payload["tool_steps"][0]["name"] == "read_file"
+
+
+def test_trajectory_wire_separates_completed_loop_from_objective_verification():
+    record = trajectory_record(
+        _traj(
+            verified=True,
+            extras={"trajectory_id": "completion-only", "telemetry": {}, "objective_verified": False},
+        )
+    )
+    payload = record.to_dict()
+    assert payload["verified"] is True
+    assert payload["objective_verified"] is False
+
+
+def test_observable_audit_payload_contains_resolved_artifacts_not_hidden_reasoning():
+    traj = _traj()
+    cache = build_cache_integrity_report(traj.extras["telemetry"], traj.steps)
+    evidence = build_evidence_claims(traj, cache)
+    payload = observable_audit_payload(traj, cache, evidence)
+    assert payload["schema_version"] == "helix.audit-input.v1"
+    assert payload["trajectory"]["schema_version"] == TRAJECTORY_SCHEMA_VERSION
+    assert "reasoning" not in payload["trajectory"]
+    assert payload["evidence"][0]["claim_id"] == "task-outcome"
+    assert "cache_integrity" in payload
+
+
+def test_counterfactual_candidate_is_versioned_and_shorter_is_not_equivalence_proof():
+    traj = _traj(
+        steps=[
+            ToolStep(name="read_file", arguments="a", result="same", useful_hint="evidence"),
+            ToolStep(name="read_file", arguments="a", result="same", useful_hint="redundant"),
+        ]
+    )
+    cache = build_cache_integrity_report(traj.extras["telemetry"], traj.steps)
+    evidence = build_evidence_claims(traj, cache)
+    audit = fallback_self_audit(traj, cache, evidence)
+    quality = build_quality_vector(traj, cache, evidence, audit)
+    # A client/model cannot spoof equivalence through ordinary telemetry.
+    traj.extras["telemetry"]["counterfactual_equivalent_verified"] = True
+    candidate = build_counterfactual_candidate(
+        traj,
+        quality=quality,
+        evidence_ids=[item.claim_id for item in evidence],
+    )
+    assert candidate.schema_version == "helix.counterfactual.v1"
+    assert candidate.proposed_tool_calls < candidate.actual_tool_calls
+    assert candidate.equivalence_status == EvidenceStatus.UNVERIFIED
+    assert candidate.equivalence_verified is False
+    assert candidate.training_pair_eligible is False
+
+
+def test_closed_loop_records_objective_decision_outcomes_and_measured_calibration(tmp_path, monkeypatch):
+    monkeypatch.setenv("HELIX_ENGINE_LEDGER_ROOT", str(tmp_path))
+    result = run_adaptation_pipeline(_traj())
+    adaptive = result["adaptive_cycle"]
+    assert adaptive["decision_outcomes"]["EVIDENCE_SUFFICIENT"] is True
+    assert adaptive["decision_calibration"]["calibration_measured"] is True
+    assert adaptive["decision_calibration"]["labelled_decisions"] >= 2
+    assert adaptive["decision_calibration"]["brier_score"] is not None
+    assert adaptive["decision_calibration"]["calibrated"] is False
+    assert calibration_summary()["labelled_decisions"] >= 2
 
 
 def test_adaptation_retains_trajectory_and_evidence_provenance():
@@ -242,6 +475,27 @@ def test_adaptation_retains_trajectory_and_evidence_provenance():
     assert decision.action == AdaptationKind.SKILL
     assert decision.source_trajectory_ids == ["prov-123"]
     assert "task-outcome" in decision.evidence_ids
+
+
+def test_hermes_records_adaptation_disagreement_with_model_self_audit():
+    repeated_result = "same memory result"
+    traj = _traj(
+        steps=[
+            ToolStep(name="search_memory", arguments='{"query":"x"}', result=repeated_result),
+            ToolStep(name="search_conversation", arguments='{"query":"x"}', result=repeated_result),
+        ],
+        extras={"trajectory_id": "disagreement-1", "telemetry": {}, "objective_verified": False},
+    )
+    cache = build_cache_integrity_report({}, traj.steps)
+    evidence = build_evidence_claims(traj, cache)
+    audit = parse_self_audit({"objective": "x", "achieved": True, "recommendation": "IGNORE"})
+    assert audit is not None
+    quality = build_quality_vector(traj, cache, evidence, audit)
+
+    decision = adjudicate(traj, audit, evidence, cache, quality, recurrence=1)
+
+    assert decision.action == AdaptationKind.RUNTIME_POLICY
+    assert decision.self_assessment_disagreement is True
 
 
 def test_ordinary_examples_do_not_autostart_qlora(tmp_path, monkeypatch):

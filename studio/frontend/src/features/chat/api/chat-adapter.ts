@@ -199,6 +199,7 @@ import {
   stripOnTheFlySkillDraft,
   stripHermesLearningProposal,
 } from "../lib/hermes-learning";
+import { observeHelixContextTelemetry } from "../lib/helix-context-telemetry";
 import { createLearningProposal, getLearningContext } from "./learning-api";
 import {
   recordSelfTrainingExample,
@@ -371,9 +372,52 @@ function scheduleSelfReflect(input: SelfReflectInput): void {
         telemetry: input.telemetry ?? {},
         tool_steps: Array.isArray(trace.steps) ? trace.steps.slice(-16) : [],
       };
-      const idleForAudit = await waitForSelfAuditIdle(input.force ? 20_000 : 8_000);
+      const effectiveModelId = `${input.checkpoint}::adapter=${
+        input.useAdapter === true ? "enabled" : input.useAdapter === false ? "disabled" : "unspecified"
+      }`;
+      const postTaskTelemetry: Record<string, unknown> = { ...(input.telemetry ?? {}) };
+      let resolvedObservableArtifacts: Record<string, unknown> = observableArtifacts;
+      let performDeepAudit = true;
+      try {
+        const preparationResponse = await authFetch("/api/helix-engine/prepare-audit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            session_id: captureSessionId,
+            thread_id: input.threadId,
+            turn_id: input.turnId,
+            prompt: input.userText.slice(0, 4_000),
+            final_result: input.assistantText.slice(0, 4_000),
+            model_id: input.checkpoint,
+            effective_model_id: effectiveModelId,
+            adapter_state: input.useAdapter,
+            telemetry: postTaskTelemetry,
+          }),
+        });
+        if (preparationResponse.ok) {
+          const preparation = (await preparationResponse.json()) as {
+            available?: boolean;
+            perform_deep_audit?: boolean;
+            decision?: Record<string, unknown>;
+            artifacts?: Record<string, unknown>;
+          };
+          if (preparation.available !== false && preparation.artifacts) {
+            resolvedObservableArtifacts = preparation.artifacts;
+          }
+          if (preparation.perform_deep_audit === false) performDeepAudit = false;
+          if (preparation.decision) postTaskTelemetry.pre_audit_decision = preparation.decision;
+        }
+      } catch {
+        // Preparation failure must preserve the old behavior: run the deep audit.
+        performDeepAudit = true;
+      }
+      postTaskTelemetry.self_audit_requested = performDeepAudit;
+      const idleForAudit = performDeepAudit
+        ? await waitForSelfAuditIdle(input.force ? 20_000 : 8_000)
+        : false;
       let audit: ReturnType<typeof parseHelixSelfAudit> = null;
       if (idleForAudit) {
+        const auditStarted = performance.now();
         const response = await authFetch("/v1/chat/completions", {
           method: "POST",
           headers: {
@@ -382,20 +426,34 @@ function scheduleSelfReflect(input: SelfReflectInput): void {
           },
           body: JSON.stringify({
             model: input.checkpoint,
-            messages: [{ role: "user", content: helixSelfAuditPrompt(excerpt, observableArtifacts) }],
+            messages: [{ role: "user", content: helixSelfAuditPrompt(excerpt, resolvedObservableArtifacts) }],
             max_tokens: 900,
             stream: false,
             enable_tools: false,
+            enable_thinking: false,
+            // A self-audit must use only the supplied observable bundle. The
+            // checkpoint policy can auto-admit internal memory search even when
+            // ordinary tools are disabled, so force rolling context here.
+            context_policy: "rolling",
             ...(input.useAdapter === undefined ? {} : { use_adapter: input.useAdapter }),
           }),
         });
         const payload = response.ok
           ? ((await response.json()) as {
               choices?: Array<{ message?: { content?: string } }>;
+              usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
             })
           : null;
+        postTaskTelemetry.self_audit_ms = Math.max(0, performance.now() - auditStarted);
+        postTaskTelemetry.self_audit_prompt_tokens = payload?.usage?.prompt_tokens ?? null;
+        postTaskTelemetry.self_audit_completion_tokens = payload?.usage?.completion_tokens ?? null;
+        postTaskTelemetry.self_audit_total_tokens = payload?.usage?.total_tokens ?? null;
         const text = payload?.choices?.[0]?.message?.content ?? "";
         audit = parseHelixSelfAudit(text);
+      } else if (!performDeepAudit) {
+        postTaskTelemetry.self_audit_skipped_by_decision = true;
+      } else {
+        postTaskTelemetry.self_audit_skipped_reason = "runtime_not_idle";
       }
       await authFetch("/api/helix-engine/ingest-turn", {
         method: "POST",
@@ -409,11 +467,9 @@ function scheduleSelfReflect(input: SelfReflectInput): void {
           // Keep the loadable checkpoint separate from the behavioral identity.
           // Recurrence/provenance must not merge base and adapter trajectories.
           model_id: input.checkpoint,
-          effective_model_id: `${input.checkpoint}::adapter=${
-            input.useAdapter === true ? "enabled" : input.useAdapter === false ? "disabled" : "unspecified"
-          }`,
+          effective_model_id: effectiveModelId,
           adapter_state: input.useAdapter,
-          telemetry: input.telemetry ?? {},
+          telemetry: postTaskTelemetry,
           ...(audit ? { self_audit: audit, claims: audit.claims } : {}),
         }),
       }).catch(() => undefined);
@@ -8324,6 +8380,41 @@ export function createOpenAIStreamAdapter(
             ),
             ...(resolvedThreadId ? { sourceThreadId: resolvedThreadId } : {}),
           }).catch(() => undefined);
+          let helixContextTelemetry: Record<string, unknown> = {};
+          try {
+            helixContextTelemetry = observeHelixContextTelemetry({
+              scope: `${resolvedThreadId ?? sandboxSessionId ?? "default"}::${params.checkpoint}`,
+              systemPrompt: combinedSystemPrompt,
+              userSystemPrompt: typeof params.systemPrompt === "string" ? params.systemPrompt : "",
+              toolCatalogSignature: JSON.stringify({
+                localCode: studioLocalCodeTools,
+                hostedCode: hostedCodeToolsForThisTurn,
+                webSearch: webSearchEnabledForThisTurn,
+                webFetch: webFetchEnabledForThisTurn,
+                codeExecution: codeExecEnabledForThisTurn,
+                imageGeneration: imageGenerationEnabledForThisTurn,
+              }),
+              messages: outboundMessages,
+              promptTokens: meta?.usage?.prompt_tokens ?? 0,
+              cachedTokens,
+            });
+          } catch {
+            // Context telemetry is observational only and may never affect chat.
+          }
+          const helixTelemetryProvenance = {
+            ...((helixContextTelemetry.telemetry_provenance as Record<string, unknown> | undefined) ?? {}),
+            prompt_tokens: "server_usage",
+            cached_tokens: "server_prompt_cache_usage",
+            prefill_ms: "server_timing",
+            decode_ms: "server_timing",
+            ttft_ms: "client_stream_observation",
+            context_compactions: "chat_runtime_context_truncation",
+            speculative_requested: "server_speculative_metadata",
+            speculative_engaged: "server_speculative_metadata",
+            accepted_drafts: "server_speculative_metadata",
+            rejected_drafts: "derived_server_draft_minus_accepted",
+            runtime_config: "request_and_server_runtime_metadata",
+          };
           scheduleSelfReflect({
             threadId: resolvedThreadId ?? undefined,
             sessionId: sandboxSessionId ?? resolvedThreadId ?? undefined,
@@ -8335,6 +8426,7 @@ export function createOpenAIStreamAdapter(
             // before another request can mutate the shared adapter state.
             useAdapter: effectiveUseAdapter,
             telemetry: {
+              ...helixContextTelemetry,
               prompt_tokens: meta?.usage?.prompt_tokens ?? 0,
               completion_tokens: meta?.usage?.completion_tokens ?? finalTokenCount,
               cached_tokens: cachedTokens,
@@ -8355,6 +8447,7 @@ export function createOpenAIStreamAdapter(
               speculative_sidecar_ok: Boolean(meta?.speculative?.used),
               speculative_counter_scope: meta?.speculative?.counter_scope ?? "",
               speculative_counter_reason: meta?.speculative?.counter_reason ?? "",
+              telemetry_provenance: helixTelemetryProvenance,
               runtime_config: {
                 model: params.checkpoint,
                 backend: isMlxRequest

@@ -7,6 +7,7 @@ from .schemas import (
     AdaptationDecision,
     AdaptationKind,
     CacheIntegrityReport,
+    CounterfactualTrajectoryCandidate,
     EvidenceClaim,
     EvidenceStatus,
     QualityVector,
@@ -26,6 +27,7 @@ def adjudicate(
     quality: QualityVector,
     *,
     recurrence: int = 1,
+    counterfactual: CounterfactualTrajectoryCandidate | None = None,
 ) -> AdaptationDecision:
     unsupported = [
         item for item in evidence if item.status in {EvidenceStatus.CONTRADICTED, EvidenceStatus.UNVERIFIED}
@@ -78,10 +80,16 @@ def adjudicate(
         action = AdaptationKind.SKILL
         reason = "reusable procedure is better represented as a skill before weights"
 
+    # A self-audit recommendation is advisory. When Hermes selects a different
+    # adaptation because objective cache/evidence/safety gates say otherwise,
+    # preserve that mismatch explicitly as self-assessment disagreement.
+    if action != requested:
+        disagreement = True
+
     # Objective contradiction always wins over a model's claim of success. It does not erase an
     # independently useful runtime/skill adaptation; it only records the disagreement.
     rejected = [item.claim_id for item in unsupported]
-    return AdaptationDecision(
+    decision = AdaptationDecision(
         action=action,
         reason=reason,
         qlora_eligible=qlora_eligible,
@@ -94,3 +102,16 @@ def adjudicate(
         self_assessment_disagreement=disagreement,
         advisory_only=True,
     )
+    if counterfactual is not None:
+        decision.counterfactual_candidate_id = counterfactual.candidate_id
+        decision.counterfactual_equivalence_status = counterfactual.equivalence_status
+        # Hermes may admit an efficiency pair only after an independent
+        # equivalence verifier established the same outcome and the source run
+        # retained high task/evidence quality. Shortness/confidence alone cannot.
+        decision.efficiency_training_eligible = bool(
+            counterfactual.training_pair_eligible
+            and counterfactual.equivalence_verified
+            and quality.task_quality >= 0.75
+            and quality.evidentiary_completeness >= 0.75
+        )
+    return decision

@@ -51,3 +51,16 @@ test("send path sanitizes dangling tool calls before the completions request", (
   assert.match(src, /sanitizeDanglingToolCalls\(outboundRaw\)/);
   assert.match(src, /deleteOrphanAssistantMessage/);
 });
+
+test("background self-audit disables checkpoint memory-tool recovery", () => {
+  const src = readSrc("features/chat/api/chat-adapter.ts");
+  const start = src.indexOf('"X-Helix-Background-Audit": "1"');
+  assert.ok(start >= 0);
+  const end = src.indexOf("const payload = response.ok", start);
+  assert.ok(end > start);
+  const auditRequest = src.slice(start, end);
+  assert.match(auditRequest, /enable_tools: false/);
+  assert.match(auditRequest, /enable_thinking: false/);
+  assert.match(auditRequest, /context_policy: "rolling"/);
+  assert.doesNotMatch(auditRequest, /thread_id:/);
+});

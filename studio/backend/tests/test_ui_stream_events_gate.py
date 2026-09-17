@@ -27,12 +27,17 @@ from core.inference.sse_control_frames import (
     strip_server_executed_tool_call,
 )
 from routes.inference import (
+    HELIX_BACKGROUND_AUDIT_HEADER,
     _LOCAL_TOOL_STREAM_STALL_KEEPALIVE_S,
     UI_STREAM_EVENTS_HEADER,
     _DroppedFrameKeepalive,
+    _apply_helix_background_audit_tool_policy,
     _confirm_gate_has_no_channel,
+    _effective_enable_tools,
+    _helix_background_audit_enabled,
     _launcher_tool_default_applies,
     _proxy_to_external_provider,
+    _tool_calls_are_disabled,
     _ui_stream_events_enabled,
     produce_openai_chat_completions,
 )
@@ -79,6 +84,53 @@ def test_other_header_values_do_not_opt_in():
 
 def test_none_request_is_refused():
     assert _ui_stream_events_enabled(None) is False
+
+
+def test_helix_background_audit_header_forces_tool_loop_unreachable_even_under_cli_enable(monkeypatch):
+    from models.inference import ChatCompletionRequest
+    from state import tool_policy
+
+    request = _request([(HELIX_BACKGROUND_AUDIT_HEADER.lower().encode(), b"1")])
+    payload = ChatCompletionRequest(
+        messages=[{"role": "user", "content": "audit supplied artifacts only"}],
+        enable_tools=True,
+        enabled_tools=["search_memory", "terminal"],
+        mcp_enabled=True,
+        deep_research_armed=True,
+        max_tool_calls_per_message=25,
+        confirm_tool_calls=True,
+        permission_mode="ask",
+    )
+    monkeypatch.setattr(tool_policy, "get_tool_policy", lambda: True)
+
+    assert _helix_background_audit_enabled(request) is True
+    normalized = _apply_helix_background_audit_tool_policy(payload, request)
+    # The process-level hard override is still intact globally...
+    assert _effective_enable_tools(normalized) is True
+    # ...but the existing hard-withdrawal contract makes this request unable to
+    # enter the tool loop or checkpoint-memory recovery.
+    assert normalized.tool_choice == "none"
+    assert normalized.max_tool_calls_per_message == 0
+    assert normalized.tools is None
+    assert normalized.enabled_tools == []
+    assert normalized.mcp_enabled is False
+    assert normalized.deep_research_armed is False
+    assert normalized.confirm_tool_calls is False
+    assert normalized.permission_mode == "off"
+    assert _tool_calls_are_disabled(normalized) is True
+
+
+def test_ordinary_request_is_unchanged_by_helix_audit_policy():
+    from models.inference import ChatCompletionRequest
+
+    request = _request([])
+    payload = ChatCompletionRequest(
+        messages=[{"role": "user", "content": "normal chat"}],
+        enable_tools=True,
+        enabled_tools=["search_memory"],
+    )
+    assert _helix_background_audit_enabled(request) is False
+    assert _apply_helix_background_audit_tool_policy(payload, request) is payload
 
 
 def test_background_generation_run_opts_into_control_frames():

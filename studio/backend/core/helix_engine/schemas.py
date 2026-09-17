@@ -8,6 +8,8 @@ from enum import Enum
 from typing import Any, Optional
 
 SCHEMA_VERSION = "helix.adaptive.v1"
+TRAJECTORY_SCHEMA_VERSION = "helix.trajectory.v1"
+COUNTERFACTUAL_SCHEMA_VERSION = "helix.counterfactual.v1"
 
 
 class CacheCause(str, Enum):
@@ -86,6 +88,7 @@ class CacheDisruption(WireRecord):
     necessary: bool
     estimated_cost_tokens: int = 0
     evidence: list[str] = field(default_factory=list)
+    provenance: str = ""
 
 
 @dataclass
@@ -114,6 +117,54 @@ class CacheIntegrityReport(WireRecord):
     runtime_config: dict[str, Any] = field(default_factory=dict)
     disruptions: list[CacheDisruption] = field(default_factory=list)
     observable_fields: list[str] = field(default_factory=list)
+    telemetry_provenance: dict[str, str] = field(default_factory=dict)
+    unavailable_fields: list[str] = field(default_factory=list)
+
+
+@dataclass
+class TrajectoryRecord(WireRecord):
+    """Versioned observable trajectory envelope for persistence and audit I/O."""
+
+    schema_version: str = TRAJECTORY_SCHEMA_VERSION
+    trajectory_id: str = ""
+    objective: str = ""
+    presented_context: str = ""
+    tool_steps: list[dict[str, Any]] = field(default_factory=list)
+    final_result: str = ""
+    acceptance_criteria: list[str] = field(default_factory=list)
+    telemetry: dict[str, Any] = field(default_factory=dict)
+    # Legacy pipeline completion/critic bit. This is not objective proof.
+    verified: bool = False
+    # Backend-resolved objective outcome verification, kept separate so the wire
+    # record cannot imply that a completed tool loop proved its own claims.
+    objective_verified: bool = False
+    latency_ms: float = 0.0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    model_id: str = ""
+
+
+@dataclass
+class CounterfactualTrajectoryCandidate(WireRecord):
+    """A proposed shorter trajectory, never ground truth by construction."""
+
+    schema_version: str = COUNTERFACTUAL_SCHEMA_VERSION
+    candidate_id: str = ""
+    source_trajectory_id: str = ""
+    provenance: str = "deterministic_credit_compression"
+    proposed_actions: list[dict[str, Any]] = field(default_factory=list)
+    kept_indices: list[int] = field(default_factory=list)
+    same_result_target: str = ""
+    actual_tool_calls: int = 0
+    proposed_tool_calls: int = 0
+    estimated_tool_calls_saved: int = 0
+    estimated_tokens_saved: int = 0
+    confidence: float = 0.0
+    equivalence_status: EvidenceStatus = EvidenceStatus.UNVERIFIED
+    equivalence_verified: bool = False
+    evidence_ids: list[str] = field(default_factory=list)
+    source_quality: dict[str, Any] = field(default_factory=dict)
+    training_pair_eligible: bool = False
 
 
 @dataclass
@@ -196,3 +247,6 @@ class AdaptationDecision(WireRecord):
     rejected_claim_ids: list[str] = field(default_factory=list)
     self_assessment_disagreement: bool = False
     advisory_only: bool = True
+    counterfactual_candidate_id: str = ""
+    counterfactual_equivalence_status: EvidenceStatus = EvidenceStatus.UNVERIFIED
+    efficiency_training_eligible: bool = False

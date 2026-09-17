@@ -8,6 +8,8 @@ from typing import Any, Iterable
 from .schemas import DecisionChoice, DecisionKind, DecisionRecord
 
 POLICY_VERSION = "helix-shadow-v1"
+FALLBACK_POLICY_VERSION = "helix-fallback-v1"
+_MIN_CALIBRATION_LABELS = 50
 
 
 def parse_decision_kind(value: str | DecisionKind) -> DecisionKind:
@@ -89,6 +91,47 @@ def shadow_decision(
     )
 
 
+def safe_advisory_decision(
+    kind: str | DecisionKind,
+    features: dict[str, Any] | None = None,
+    *,
+    decision_id: str = "",
+    trajectory_id: str = "",
+    fallback_choice: DecisionChoice = DecisionChoice.TAKE,
+) -> DecisionRecord:
+    """Fail-open advisory wrapper for production allocation points.
+
+    The fallback preserves the caller's established behavior. A controller bug is
+    recorded as zero-confidence metadata; it never becomes authority to suppress a
+    previously executed safety/reliability path.
+    """
+    try:
+        return shadow_decision(
+            kind,
+            features,
+            decision_id=decision_id,
+            trajectory_id=trajectory_id,
+        )
+    except BaseException as exc:  # optional controller must also survive cancellation-like faults
+        try:
+            parsed = parse_decision_kind(kind)
+        except Exception:
+            parsed = DecisionKind.IGNORE_NOISE
+        evidence = dict(features or {})
+        evidence["controller_fallback"] = f"{type(exc).__name__}: {exc}"[:500]
+        return DecisionRecord(
+            decision_id=decision_id,
+            trajectory_id=trajectory_id,
+            decision=parsed,
+            probability=1.0 if fallback_choice == DecisionChoice.TAKE else 0.0,
+            confidence=0.0,
+            choice=fallback_choice,
+            advisory_only=True,
+            policy_version=FALLBACK_POLICY_VERSION,
+            evidence_features=evidence,
+        )
+
+
 def brier_score(records: Iterable[DecisionRecord]) -> float | None:
     pairs = [record for record in records if record.eventual_outcome is not None]
     if not pairs:
@@ -139,6 +182,10 @@ def calibration_summary() -> dict[str, Any]:
             "labelled_decisions": 0,
             "brier_score": None,
             "calibrated": False,
+            "calibration_measured": False,
+            "measurement_mature": False,
+            "minimum_labels_for_maturity": _MIN_CALIBRATION_LABELS,
+            "bins": [],
         }
     squared = []
     for row in labelled:
@@ -148,10 +195,36 @@ def calibration_summary() -> dict[str, Any]:
             probability = 0.5
         outcome = 1.0 if row.get("eventual_outcome") else 0.0
         squared.append((probability - outcome) ** 2)
+    bins = []
+    for lower in (0.0, 0.2, 0.4, 0.6, 0.8):
+        upper = lower + 0.2
+        members = []
+        for row in labelled:
+            try:
+                probability = max(0.0, min(1.0, float(row.get("probability", 0.5))))
+            except (TypeError, ValueError):
+                probability = 0.5
+            if lower <= probability < upper or (upper >= 1.0 and probability == 1.0):
+                members.append((probability, 1.0 if row.get("eventual_outcome") else 0.0))
+        if members:
+            bins.append(
+                {
+                    "lower": round(lower, 2),
+                    "upper": round(min(1.0, upper), 2),
+                    "count": len(members),
+                    "mean_probability": sum(item[0] for item in members) / len(members),
+                    "observed_frequency": sum(item[1] for item in members) / len(members),
+                }
+            )
     return {
         "schema_version": "helix.decision-calibration.v1",
         "labelled_decisions": len(squared),
         "brier_score": sum(squared) / len(squared),
-        # Measurement exists; this does NOT mean the controller is well calibrated.
+        "calibration_measured": True,
+        "measurement_mature": len(squared) >= _MIN_CALIBRATION_LABELS,
+        "minimum_labels_for_maturity": _MIN_CALIBRATION_LABELS,
+        "bins": bins,
+        # Measurement is not equivalent to a calibration guarantee. Keep this
+        # conservative until a dedicated held-out calibration study exists.
         "calibrated": False,
     }

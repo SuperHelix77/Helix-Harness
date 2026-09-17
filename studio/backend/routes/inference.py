@@ -22352,6 +22352,7 @@ def _chat_cancel_event(request: Request) -> threading.Event:
 # (the Anthropic route already drops these events for the same reason). So the default is a
 # clean OpenAI stream and the Studio UI opts back in with this header.
 UI_STREAM_EVENTS_HEADER = "X-Unsloth-Events"
+HELIX_BACKGROUND_AUDIT_HEADER = "X-Helix-Background-Audit"
 
 
 def _ui_stream_events_enabled(request: Optional[Request]) -> bool:
@@ -22366,6 +22367,67 @@ def _ui_stream_events_enabled(request: Optional[Request]) -> bool:
     except Exception:
         return False
     return (value or "").strip() == "1"
+
+
+def _helix_background_audit_enabled(request: Optional[Request]) -> bool:
+    """Whether this completion is Helix's artifact-only post-task self-audit.
+
+    The desktop marks these internal requests with a dedicated header. A background
+    audit must never inherit the launcher's ``--enable-tools`` override, MCP catalog,
+    checkpoint-memory recovery, or deep-research tool: the model is auditing the
+    bounded observable bundle already supplied in its prompt. This header can only
+    REMOVE capabilities, so accepting it from another local caller cannot escalate
+    authority.
+    """
+    if request is None:
+        return False
+    headers = getattr(request, "headers", None)
+    if headers is None:
+        return False
+    try:
+        value = headers.get(HELIX_BACKGROUND_AUDIT_HEADER)
+    except Exception:
+        return False
+    return (value or "").strip() == "1"
+
+
+def _apply_helix_background_audit_tool_policy(payload, request: Optional[Request]):
+    """Return an audit request whose local tool loop is unreachable.
+
+    ``enable_tools=False`` alone is insufficient when the process was launched with
+    ``--enable-tools`` because that operator policy intentionally outranks ordinary
+    request fields. Helix audit traffic is different: it is an internal control-plane
+    request whose contract is *artifact-only*. ``tool_choice=none`` plus a zero tool
+    budget is the existing backend-wide hard withdrawal understood by GGUF,
+    safetensors/MLX, confirmation, and checkpoint-recall paths.
+    """
+    if not _helix_background_audit_enabled(request):
+        return payload
+    updates = {
+        "enable_tools": False,
+        "enabled_tools": [],
+        "tools": None,
+        "tool_choice": "none",
+        "mcp_enabled": False,
+        "deep_research_armed": False,
+        "max_tool_calls_per_message": 0,
+        "confirm_tool_calls": False,
+        "permission_mode": "off",
+    }
+    copier = getattr(payload, "model_copy", None)
+    if callable(copier):
+        return copier(update=updates)
+    # Defensive fallback for internal lightweight payload objects. This path is not
+    # used by the public Pydantic request models but keeps helpers/tests predictable.
+    import copy
+
+    cloned = copy.copy(payload)
+    for key, value in updates.items():
+        try:
+            setattr(cloned, key, value)
+        except Exception:
+            pass
+    return cloned
 
 
 # The loaded model serves the request, so a caller that cannot use speech says so per request.
@@ -22460,6 +22522,7 @@ async def produce_openai_chat_completions(
         request,
         cancel_on_disconnect = cancel_on_disconnect,
     )
+    payload = _apply_helix_background_audit_tool_policy(payload, request)
     # Opt-in per request (see UI_STREAM_EVENTS_HEADER); captured once so every stream
     # generator below shares one answer.
     _ui_events = _ui_stream_events_enabled(request)
@@ -31374,6 +31437,7 @@ async def chat_count_tokens(
         lambda: account_access.resident_hidden("chat", _loaded_slot_ident())
     ):
         raise HTTPException(status_code = 404, detail = "Model not found")
+    payload = _apply_helix_background_audit_tool_policy(payload, request)
     # Admitted only while nothing generates, and stood down at the next checkpoint if that changes:
     # admission is not atomic with the work, and true mutual exclusion would put a lock in front of
     # generation startup, which is the cost this avoids. Refusing here also covers the second tab or

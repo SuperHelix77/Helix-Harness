@@ -5,8 +5,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from .schemas import AdaptationKind, CacheIntegrityReport, EvidenceClaim, SelfAuditReport
-from .trajectory import Trajectory
+from .schemas import AdaptationKind, CacheIntegrityReport, DecisionChoice, DecisionKind, EvidenceClaim, SelfAuditReport
+from .trajectory import Trajectory, trajectory_record
 
 
 def _strings(value: Any, limit: int = 32, width: int = 1_000) -> list[str]:
@@ -64,29 +64,116 @@ def observable_audit_payload(
     evidence: list[EvidenceClaim],
 ) -> dict[str, Any]:
     """Artifacts the model may audit. Intentionally excludes ``Trajectory.reasoning``."""
+    record = trajectory_record(traj)
+    edits = [
+        step
+        for step in record.tool_steps
+        if any(token in str(step.get("name") or "").lower() for token in ("edit", "write", "patch", "replace"))
+    ]
+    tests = [
+        step
+        for step in record.tool_steps
+        if isinstance(step.get("verification"), dict)
+        and step["verification"].get("kind") == "test"
+    ]
+    benchmarks = [
+        step
+        for step in record.tool_steps
+        if isinstance(step.get("verification"), dict)
+        and step["verification"].get("kind") == "benchmark"
+    ]
     return {
         "schema_version": "helix.audit-input.v1",
-        "objective": traj.prompt_state[:4_000],
-        "presented_context": traj.retrieved_context[:8_000],
-        "tool_steps": [
-            {
-                "name": step.name,
-                "arguments": step.arguments[:2_000],
-                "result": step.result[:4_000],
-                "error": step.error,
-                "retry": step.retry,
-                "useful_hint": step.useful_hint,
-            }
-            for step in traj.steps[-100:]
-        ],
-        "final_result": traj.final_result[:8_000],
-        "acceptance_criteria": (traj.extras.get("acceptance_criteria") or []) if isinstance(traj.extras, dict) else [],
+        "trajectory": record.to_dict(),
+        "objective": record.objective[:4_000],
+        "presented_context": record.presented_context[:8_000],
+        "tool_steps": record.tool_steps[-100:],
+        "edits": edits[-32:],
+        "tests": tests[-32:],
+        "benchmarks": benchmarks[-32:],
+        "final_result": record.final_result[:8_000],
+        "acceptance_criteria": record.acceptance_criteria,
         "cache_integrity": cache.to_dict(),
         "evidence": [item.to_dict() for item in evidence],
+        "objective_outcome_evidence": [
+            item.to_dict() for item in evidence if item.claim_id == "task-outcome"
+        ],
         "verified": bool(traj.verified),
         "prompt_tokens": traj.prompt_tokens,
         "completion_tokens": traj.completion_tokens,
         "latency_ms": traj.latency_ms,
+    }
+
+
+def prepare_observable_self_audit(
+    traj: Trajectory,
+    *,
+    claims: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Prepare the backend-resolved audit bundle and a cheap pre-audit gate.
+
+    Any failure in this optional path must preserve the historical behavior of
+    running the deep audit, so the fail-open choice is TAKE.
+    """
+    from .cache_integrity import build_cache_integrity_report
+    from .decision_controller import safe_advisory_decision
+    from .evidence import build_evidence_claims, discover_important_claims
+    from .ledger import append_record
+
+    extras = traj.extras if isinstance(traj.extras, dict) else {}
+    telemetry = extras.get("telemetry") if isinstance(extras.get("telemetry"), dict) else {}
+    trajectory_id = str(extras.get("trajectory_id") or "")
+    cache = build_cache_integrity_report(telemetry, traj.steps)
+    discovered_claims = discover_important_claims(traj, claims)
+    evidence = build_evidence_claims(traj, cache, discovered_claims)
+    missing = sum(len(item.missing_evidence) for item in evidence)
+    contradictions = sum(bool(item.contradicting_evidence) for item in evidence)
+    high_impact = any(
+        token in item.claim.lower()
+        for item in evidence
+        for token in ("speed", "throughput", "5x", "security", "correctness")
+    )
+    criteria = extras.get("acceptance_criteria") if isinstance(extras.get("acceptance_criteria"), list) else []
+    meaningful = bool(traj.steps or criteria or high_impact)
+    features = {
+        "missing_evidence_count": missing,
+        "contradiction_count": contradictions,
+        "has_evidence": any(item.supporting_evidence for item in evidence),
+        "meaningful_task": meaningful,
+        "high_impact_claim": high_impact,
+        "tool_calls": len(traj.steps),
+        "failed_tool": any(step.error for step in traj.steps),
+        "acceptance_criteria_count": len(criteria),
+    }
+    decision = safe_advisory_decision(
+        DecisionKind.DEEP_SELF_AUDIT,
+        features,
+        decision_id=f"{trajectory_id}:{DecisionKind.DEEP_SELF_AUDIT.value}:pre",
+        trajectory_id=trajectory_id,
+        fallback_choice=DecisionChoice.TAKE,
+    )
+    # Deterministic reliability conditions can force a deep audit; the advisory
+    # controller can save cost only in the low-risk remainder.
+    forced_reasons = []
+    if any(step.error for step in traj.steps):
+        forced_reasons.append("failed_tool")
+    if criteria:
+        forced_reasons.append("acceptance_criteria")
+    if high_impact:
+        forced_reasons.append("high_impact_claim")
+    if any(step.verification is not None for step in traj.steps):
+        forced_reasons.append("typed_verification")
+    perform_deep = bool(forced_reasons or decision.choice == DecisionChoice.TAKE)
+    append_record("decisions", decision.to_dict())
+    payload = observable_audit_payload(traj, cache, evidence)
+    payload["pre_audit_decision"] = decision.to_dict()
+    payload["deep_audit_forced_reasons"] = forced_reasons
+    return {
+        "schema_version": "helix.audit-preparation.v1",
+        "available": True,
+        "perform_deep_audit": perform_deep,
+        "decision": decision.to_dict(),
+        "artifacts": payload,
     }
 
 

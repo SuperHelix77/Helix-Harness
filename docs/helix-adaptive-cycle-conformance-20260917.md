@@ -4,6 +4,10 @@ Date: 2026-09-17
 Audited HEAD: `fe105e5` (`fix: restore Helix engine UI and glass branding`)
 Adaptive-cycle implementation commits: `174e429` baseline, `158d6bf` hardening, `1523ed4` completed self-evolution loop
 
+> **Post-audit completion update — 2026-09-17:** the nine concrete gaps identified by this audit have now been implemented in the completion pass described by `docs/HELIX_ADAPTIVE_CYCLE_COMPLETION_CHECKPOINT_20260917.md`. The historical audit below is preserved as the evidence that drove the work; it is not rewritten to pretend those features existed at the audited HEAD. Current completion evidence is in `docs/helix-adaptive-cycle-acceptance-20260917.md`.
+>
+> Closure highlights: live bounded context fingerprints/provenance; pre-generative `DEEP_SELF_AUDIT` allocation with fail-open old-behavior fallback; objective retrospective decision labels plus measured Brier/reliability bins; backend-resolved audit artifacts; `helix.trajectory.v1`; `helix.counterfactual.v1`; append-only trajectory/counterfactual provenance; a committed SSE acceptance collector; matched hot-path/control-plane overhead benchmarks; and a dedicated injected decision-controller failure test. The controller is **measured but not declared calibrated**. Counterfactuals are **candidates, not verified equivalents**; no client/model field can authorize equivalence or efficiency training. No 27B/general model improvement is claimed.
+
 ## Executive verdict
 
 **The architectural core is implemented and substantially matches the original plan, but the specification is not fully fulfilled.**
@@ -460,3 +464,30 @@ The remaining work is chiefly to make **TELEMETRY OBSERVES** broader and empiric
 Until those gaps are closed, the correct description is:
 
 **Helix Harness has a functioning, fail-open adaptive intelligence control loop with real same-model audit and guarded adaptation, but it has not yet completed the full calibrated cheap-decision/cache-efficiency architecture specified in the original plan.**
+
+---
+
+## Completion closure — 2026-09-17
+
+The verdict above is the historical verdict for the audited HEAD and is intentionally unchanged. The subsequent completion pass implemented the concrete gaps that audit identified. This section records the later state; it does not retroactively alter what existed at the audited commit.
+
+| Former gap | Completion state | Completion evidence / boundary |
+|---|---|---|
+| Live cache/context observation breadth | **CLOSED FOR OBSERVABLE SIGNALS** | `helix-context-telemetry.ts` adds bounded fingerprints/counters for stable-prefix derivation, prompt/tool-catalog change, insertion/reinsertion and reorder observations; backend capture contributes tool-output insertions. Runtime facts that remain unavailable are explicitly marked unavailable rather than synthesized. |
+| Cheap typed controller as a live allocator | **CLOSED TO A DELIBERATELY LIMITED LIVE SCOPE** | `DEEP_SELF_AUDIT` is now a real pre-generative allocation point. The broader typed decision family remains available/shadowed, while existing deterministic memory/search/skill/model/test/safety logic remains authoritative. No claim is made that every supported decision kind is probabilistically wired online. |
+| No empirical decision outcome/calibration data | **MEASUREMENT CLOSED; CALIBRATION CLAIM OPEN BY DESIGN** | Objective retrospective labels feed `helix.decision-calibration.v1`, Brier score and reliability bins. The final isolated acceptance replay produced 3 labels and Brier `0.011133333333333335`; `measurement_mature=false`, minimum 50, and `calibrated=false`. |
+| `DEEP_SELF_AUDIT` decision happened after generative audit | **CLOSED** | `/api/helix-engine/prepare-audit` builds cache/evidence first and makes the typed audit decision before any same-model audit. Failure conservatively falls back to deep audit. Failed tools, acceptance criteria, high-impact claims and typed verification can deterministically force it. |
+| Self-audit input too narrow | **CLOSED** | Same-model audit consumes backend-resolved `helix.audit-input.v1`: versioned trajectory, objective/context, bounded tool steps, edits, tests, benchmarks, cache telemetry, evidence, final result, acceptance criteria and objective outcome evidence. Hidden reasoning is excluded. |
+| Counterfactual compression not first-class/versioned/equivalence-gated | **CLOSED** | `helix.counterfactual.v1` is provenance-linked and stores actual/proposed actions, estimated savings, source quality/evidence and equivalence state. Current candidates remain `UNVERIFIED`, `equivalence_verified=false`, `training_pair_eligible=false` without backend-owned equivalence verification. |
+| Matched telemetry/performance evidence incomplete | **CLOSED FOR IMPLEMENTATION OVERHEAD MEASUREMENT** | `docs/helix-adaptive-cycle-overhead-20260917.json` records 20,000-iteration hot-path telemetry overhead and 100-trajectory post-task control-plane/storage measurements. The real final foreground/audit collector retains token/cache/timing frames. These measurements do not prove an equivalent-quality cache optimization speedup. |
+| Trajectory not a versioned wire record | **CLOSED** | `trajectory_record()` persists `helix.trajectory.v1` without hidden/private reasoning while preserving the existing internal dataclass for compatibility. |
+| Dedicated decision-controller crash/fallback test absent | **CLOSED** | Focused failure injection verifies controller failure produces `helix-fallback-v1`, confidence 0 and the conservative pre-existing TAKE/deep-audit behavior without suppressing task reliability. |
+
+Additional production defects exposed by the final acceptance were also closed rather than hidden:
+
+1. checkpoint/thread recovery could auto-admit memory search into a background self-audit; the audit now omits thread/session recovery and forces rolling context;
+2. process-level `--enable-tools` could still inject the full tool catalog despite request-level `enable_tools=false`; `X-Helix-Background-Audit: 1` is now a backend-owned no-tools boundary and the post-fix same-model audit emitted zero tool events;
+3. Qwythos reproducibly returned a complete audit JSON object while omitting only `</helix-self-audit>`; the production parser now accepts only that narrowly bounded shape and still rejects partial JSON or trailing prose;
+4. Hermes could override a model recommendation because of objective cache/evidence state without marking the disagreement flag; any Hermes-vs-self-audit adaptation mismatch now records `self_assessment_disagreement=true`.
+
+Final source validation, exact real-run metrics and unresolved evidence boundaries are recorded in `docs/helix-adaptive-cycle-acceptance-20260917.md`. The completion pass does **not** establish a held-out model-quality improvement, a mature empirically calibrated decision controller, independently verified counterfactual equivalence, or a measured equivalent-quality cache-optimization speedup. The pre-existing installed macOS app/managed overlay was not rebuilt from this completion source, so source completion is not packaged-app parity.

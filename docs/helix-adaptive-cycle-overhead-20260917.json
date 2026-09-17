@@ -1,0 +1,52 @@
+{
+  "hot_path_context_telemetry": {
+    "baseline": {
+      "mean_us": 0.03485274999999067,
+      "median_us": 0.041,
+      "p95_us": 0.042
+    },
+    "instrumented": {
+      "mean_us": 51.1796739999999,
+      "median_us": 44.917,
+      "p95_us": 99.416
+    },
+    "iterations": 20000,
+    "overhead": {
+      "mean_us": 51.14482124999991,
+      "median_percent": 109453.65853658537,
+      "median_us": 44.876000000000005,
+      "p95_us": 99.374
+    },
+    "schema_version": "helix.telemetry-overhead-benchmark.v1",
+    "warmup_iterations": 2000,
+    "workload": {
+      "cached_tokens": 6144,
+      "messages": 24,
+      "prompt_tokens": 8192,
+      "system_prompt_chars": 194
+    }
+  },
+  "post_task_control_plane": {
+    "closed_loop_reported_ms": {
+      "mean": 14.536631242372096,
+      "median": 16.044854506617412,
+      "p95": 21.903290995396674
+    },
+    "iterations": 100,
+    "ledger_growth_bytes": 1295822,
+    "ledger_growth_bytes_per_trajectory": 12958.22,
+    "notes": [
+      "This benchmark excludes generative self-audit latency.",
+      "Each iteration uses a unique trajectory id in an isolated temporary ledger.",
+      "The workload intentionally contains one duplicate read to exercise cache attribution."
+    ],
+    "post_task_pipeline_wall_ms": {
+      "mean": 18.34804371756036,
+      "median": 20.04352048970759,
+      "p95": 27.98600000096485
+    },
+    "schema_version": "helix.control-plane-benchmark.v1",
+    "warmup_iterations": 10
+  },
+  "schema_version": "helix.adaptive-overhead.v1"
+}

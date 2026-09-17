@@ -170,18 +170,66 @@ export function helixSelfAuditPrompt(
   const objective = String(observableArtifacts.objective ?? "").slice(0, 4_000);
   const finalResult = String(observableArtifacts.final_result ?? "").slice(0, 4_000);
   const telemetry = boundAuditJsonValue(observableArtifacts.telemetry ?? {}, 0);
+  const presentedContext = String(observableArtifacts.presented_context ?? "").slice(0, 6_000);
+  const acceptanceCriteria = boundAuditJsonValue(observableArtifacts.acceptance_criteria ?? [], 0);
+  const cacheIntegrity = boundAuditJsonValue(observableArtifacts.cache_integrity ?? {}, 0);
+  const evidence = boundAuditJsonValue(observableArtifacts.evidence ?? [], 0);
+  const objectiveOutcomeEvidence = boundAuditJsonValue(
+    observableArtifacts.objective_outcome_evidence ?? [],
+    0,
+  );
+  const edits = boundAuditJsonValue(observableArtifacts.edits ?? [], 0);
+  const tests = boundAuditJsonValue(observableArtifacts.tests ?? [], 0);
+  const benchmarks = boundAuditJsonValue(observableArtifacts.benchmarks ?? [], 0);
+  const preAuditDecision = boundAuditJsonValue(observableArtifacts.pre_audit_decision ?? {}, 0);
+  const rawTrajectory =
+    observableArtifacts.trajectory && typeof observableArtifacts.trajectory === "object"
+      ? (observableArtifacts.trajectory as Record<string, unknown>)
+      : {};
+  const trajectory = boundAuditJsonValue(
+    Object.fromEntries(
+      Object.entries(rawTrajectory).filter(
+        ([key]) => key !== "tool_steps" && key !== "reasoning",
+      ),
+    ),
+    0,
+  );
   let artifactPayload: Record<string, unknown> = {
+    schema_version: observableArtifacts.schema_version ?? "helix.audit-input.v1",
     objective,
+    presented_context: presentedContext,
     final_result: finalResult,
+    acceptance_criteria: acceptanceCriteria,
     telemetry,
+    cache_integrity: cacheIntegrity,
+    evidence,
+    objective_outcome_evidence: objectiveOutcomeEvidence,
+    edits,
+    tests,
+    benchmarks,
+    trajectory,
+    pre_audit_decision: preAuditDecision,
     tool_steps: boundedTools,
   };
   let artifacts = JSON.stringify(artifactPayload);
   if (artifacts.length > 28_000) {
     artifactPayload = {
       objective: objective.slice(0, 3_000),
+      presented_context: presentedContext.slice(0, 2_000),
       final_result: finalResult.slice(0, 3_000),
+      acceptance_criteria: acceptanceCriteria,
       telemetry: summarizeAuditTelemetry(observableArtifacts.telemetry),
+      cache_integrity: boundAuditJsonValue(observableArtifacts.cache_integrity ?? {}, 1),
+      evidence: Array.isArray(observableArtifacts.evidence)
+        ? boundAuditJsonValue(observableArtifacts.evidence.slice(0, 12), 1)
+        : evidence,
+      tests: Array.isArray(observableArtifacts.tests)
+        ? boundAuditJsonValue(observableArtifacts.tests.slice(-8), 1)
+        : tests,
+      benchmarks: Array.isArray(observableArtifacts.benchmarks)
+        ? boundAuditJsonValue(observableArtifacts.benchmarks.slice(-8), 1)
+        : benchmarks,
+      pre_audit_decision: preAuditDecision,
       tool_steps: boundedTools.slice(-8),
       helix_artifact_compaction: "structured",
     };
@@ -192,6 +240,16 @@ export function helixSelfAuditPrompt(
       objective: objective.slice(0, 2_000),
       final_result: finalResult.slice(0, 2_000),
       telemetry: { helix_artifact_compaction: "telemetry_omitted_for_size" },
+      cache_integrity: boundAuditJsonValue(observableArtifacts.cache_integrity ?? {}, 2),
+      evidence: Array.isArray(observableArtifacts.evidence)
+        ? boundAuditJsonValue(observableArtifacts.evidence.slice(0, 6), 2)
+        : [],
+      tests: Array.isArray(observableArtifacts.tests)
+        ? boundAuditJsonValue(observableArtifacts.tests.slice(-4), 2)
+        : [],
+      benchmarks: Array.isArray(observableArtifacts.benchmarks)
+        ? boundAuditJsonValue(observableArtifacts.benchmarks.slice(-4), 2)
+        : [],
       tool_steps: boundedTools.slice(-4).map((value) => {
         if (!value || typeof value !== "object") return value;
         const raw = value as Record<string, unknown>;
@@ -212,6 +270,7 @@ export function helixSelfAuditPrompt(
     "Your self-report is advisory. Hermes will compare it with tests, tool outputs, telemetry and other objective evidence. You cannot authorize training.",
     "For claims, supporting_evidence is descriptive only. Put evidence IDs from the observable artifact list into evidence_refs; only backend-resolved evidence IDs can count as proof.",
     "Recommendation must be exactly one of IGNORE, RUNTIME_POLICY, MEMORY, SKILL, QLORA_CANDIDATE, CAPABILITY_GAP. QLORA_CANDIDATE is appropriate only for a repeated behavioral tendency, never a one-off error.",
+    "Return strict valid JSON. Every top-level array other than claims must contain strings only and at most 4 items; claims may contain at most 8 objects, and each claim evidence array must contain strings only. Keep each string concise. Close every array/object and the final audit tag. Do not place recommendation fields inside reusable_lessons or any other array.",
     `Return exactly one tag: <${HELIX_SELF_AUDIT_TAG}>{"objective":"","achieved":true,"contributing_actions":[],"unnecessary_actions":[],"failures":[],"retries":[],"rediscovered_information":[],"excess_retrieval":[],"avoidable_cache_disruption":[],"tool_selection_correct":true,"expensive_resource_misuse":[],"overclaimed_claims":[],"stopped_too_early":false,"continued_too_long":false,"better_trajectory":[],"reusable_lessons":[],"likely_behavioral_pattern":false,"recommendation":"IGNORE","recommendation_reason":"","self_assessment_confidence":0.5,"claims":[{"claim_id":"","claim":"","supporting_evidence":[],"evidence_refs":[],"contradicting_evidence":[],"missing_evidence":[],"confidence":0.5}]}</${HELIX_SELF_AUDIT_TAG}>`,
     focus.trim() ? `Task summary: ${focus.trim()}` : "Task summary: completed task.",
     `Observable artifacts JSON: ${artifacts}`,
@@ -270,7 +329,7 @@ export function isHelixSelfAuditRequest(text: string): boolean {
   return text.includes(HELIX_SELF_AUDIT_PREFIX);
 }
 
-function auditStrings(value: unknown, limit = 32): string[] {
+function auditStrings(value: unknown, limit = 4): string[] {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string").slice(0, limit)
     : [];
@@ -282,9 +341,18 @@ export function parseHelixSelfAudit(text: string): HelixSelfAudit | null {
   const match = text.match(
     new RegExp(`<${HELIX_SELF_AUDIT_TAG}>\\s*([\\s\\S]*?)\\s*</${HELIX_SELF_AUDIT_TAG}>`, "i"),
   );
-  if (!match?.[1]) return null;
+  // Some otherwise well-formed local-model audits have reproducibly emitted the
+  // opening tag plus one complete JSON object but omitted only the closing tag.
+  // Accept that narrow shape only when the opening tag begins the response and
+  // *all* remaining non-whitespace text is the JSON payload. JSON.parse below
+  // therefore still rejects partial JSON and any trailing prose.
+  const unterminated = match?.[1]
+    ? null
+    : text.match(new RegExp(`^\\s*<${HELIX_SELF_AUDIT_TAG}>\\s*([\\s\\S]*?)\\s*$`, "i"));
+  const payloadText = match?.[1] ?? unterminated?.[1];
+  if (!payloadText) return null;
   let value: unknown;
-  try { value = JSON.parse(match[1]); } catch { return null; }
+  try { value = JSON.parse(payloadText); } catch { return null; }
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
   const allowed = new Set(["IGNORE", "RUNTIME_POLICY", "MEMORY", "SKILL", "QLORA_CANDIDATE", "CAPABILITY_GAP"]);
@@ -295,16 +363,16 @@ export function parseHelixSelfAudit(text: string): HelixSelfAudit | null {
         .filter((item): item is Record<string, unknown> => Boolean(
           item && typeof item === "object" && typeof (item as Record<string, unknown>).claim === "string",
         ))
-        .slice(0, 32)
+        .slice(0, 8)
         .map((claim) => ({
           claim_id: typeof claim.claim_id === "string" ? claim.claim_id.slice(0, 200) : undefined,
           claim: String(claim.claim).slice(0, 2_000),
-          supporting_evidence: auditStrings(claim.supporting_evidence, 32),
-          evidence_refs: auditStrings(claim.evidence_refs, 32)
+          supporting_evidence: auditStrings(claim.supporting_evidence, 4),
+          evidence_refs: auditStrings(claim.evidence_refs, 4)
             .map((item) => item.slice(0, 200))
             .filter((item) => HELIX_EVIDENCE_REF_RE.test(item)),
-          contradicting_evidence: auditStrings(claim.contradicting_evidence, 32),
-          missing_evidence: auditStrings(claim.missing_evidence, 32),
+          contradicting_evidence: auditStrings(claim.contradicting_evidence, 4),
+          missing_evidence: auditStrings(claim.missing_evidence, 4),
           confidence: typeof claim.confidence === "number"
             ? Math.max(0, Math.min(1, claim.confidence))
             : 0.5,

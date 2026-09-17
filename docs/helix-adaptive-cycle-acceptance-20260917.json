@@ -1,0 +1,766 @@
+{
+  "current_controller": {
+    "adaptation": {
+      "action": "RUNTIME_POLICY",
+      "advisory_only": true,
+      "counterfactual_candidate_id": "cf:07f7e51576db9ead9ef1",
+      "counterfactual_equivalence_status": "UNVERIFIED",
+      "efficiency_training_eligible": false,
+      "evidence_ids": [
+        "observable-final-1"
+      ],
+      "pattern_fingerprint": "022f832ddecc21137d8e",
+      "qlora_eligible": false,
+      "reason": "avoidable cache/context disruption is mechanical and should be fixed before training",
+      "recurrence_count": 1,
+      "rejected_claim_ids": [
+        "observable-final-1"
+      ],
+      "schema_version": "helix.adaptive.v1",
+      "self_assessment_disagreement": true,
+      "source_trajectory_ids": [
+        "helix-final3e-turn-20260917"
+      ]
+    },
+    "cache_integrity": {
+      "accepted_drafts": 0,
+      "cache_reuse_ratio": 0.794047619047619,
+      "cached_tokens": 667,
+      "context_compactions": 0,
+      "context_insertions": [
+        "tool_output:search_memory",
+        "tool_output:search_conversation"
+      ],
+      "context_reorders": 0,
+      "decode_ms": 2131.4159999999997,
+      "disruptions": [
+        {
+          "action": "repeat_tool:search_conversation",
+          "cause": "MODEL_CAUSED",
+          "estimated_cost_tokens": 34,
+          "evidence": [
+            "equivalent retrieval path, arguments, and leading result already occurred in this trajectory"
+          ],
+          "necessary": false,
+          "provenance": "backend_tool_capture"
+        }
+      ],
+      "kv_cache_resets": 0,
+      "newly_evaluated_tokens": 173,
+      "observable_fields": [
+        "prompt_tokens",
+        "cached_tokens",
+        "prefill_ms",
+        "decode_ms",
+        "ttft_ms",
+        "stable_prefix_tokens",
+        "newly_evaluated_tokens",
+        "context_insertions",
+        "repeated_context_insertions",
+        "speculative_requested",
+        "speculative_engaged",
+        "runtime_config"
+      ],
+      "prefill_ms": 443.914,
+      "prompt_reconstructions": 0,
+      "prompt_tokens": 840,
+      "rejected_drafts": 0,
+      "repeated_context_insertions": 1,
+      "runtime_config": {
+        "backend": "gguf/llama.cpp",
+        "model": "Qwythos-9B-v2-MTP-Q4_K_M",
+        "speculative": {
+          "counter_reason": "llama_server_has_no_request_scoped_speculative_counters",
+          "counter_scope": "unavailable",
+          "engaged": null,
+          "mode": null,
+          "requested": "off"
+        }
+      },
+      "schema_version": "helix.adaptive.v1",
+      "speculative_engaged": "",
+      "speculative_requested": "off",
+      "stable_prefix_tokens": 667,
+      "system_prompt_changes": 0,
+      "telemetry_provenance": {
+        "accepted_drafts": "unavailable_request_scoped_counter",
+        "cache_reuse_ratio": "derived_cached_over_prompt",
+        "cached_tokens": "real_openai_prompt_tokens_details",
+        "completion_tokens": "real_openai_usage_chunk",
+        "context_compactions": "unavailable",
+        "context_insertions": "backend_tool_capture",
+        "context_reorders": "unavailable",
+        "decode_ms": "real_llama_timings_predicted_ms",
+        "kv_cache_resets": "unavailable",
+        "newly_evaluated_tokens": "real_llama_timings_prompt_n",
+        "prefill_ms": "real_llama_timings_prompt_ms",
+        "prompt_reconstructions": "unavailable",
+        "prompt_tokens": "real_openai_usage_chunk",
+        "rejected_drafts": "unavailable_request_scoped_counter",
+        "repeated_context_insertions": "backend_tool_capture",
+        "runtime_config": "runtime_or_request_metadata",
+        "speculative_engaged": "runtime_or_request_metadata",
+        "speculative_requested": "runtime_or_request_metadata",
+        "stable_prefix_tokens": "real_openai_cached_tokens_reuse_observation",
+        "system_prompt_changes": "unavailable",
+        "tool_schema_changes": "unavailable",
+        "ttft_ms": "acceptance_client_first_ui_event"
+      },
+      "tool_schema_changes": 0,
+      "ttft_ms": 45.84816697752103,
+      "unavailable_fields": [
+        "kv_cache_resets",
+        "context_compactions",
+        "prompt_reconstructions",
+        "system_prompt_changes",
+        "tool_schema_changes",
+        "context_reorders",
+        "accepted_drafts",
+        "rejected_drafts"
+      ]
+    },
+    "controller_overhead_ms": 3.29820899059996,
+    "counterfactual_candidate": {
+      "actual_tool_calls": 2,
+      "candidate_id": "cf:07f7e51576db9ead9ef1",
+      "confidence": 0.55,
+      "equivalence_status": "UNVERIFIED",
+      "equivalence_verified": false,
+      "estimated_tokens_saved": 857,
+      "estimated_tool_calls_saved": 1,
+      "evidence_ids": [
+        "observable-final-1"
+      ],
+      "kept_indices": [
+        0
+      ],
+      "proposed_actions": [
+        {
+          "arguments": "{\"query\":\"HELIX-FINAL-1709\"}",
+          "expected_evidence": "from: mem0\nHelix final acceptance codename: Final acceptance codename HELIX-FINAL-1709. The only requested codename is HELIX-FINAL-1709.",
+          "index": 0,
+          "name": "search_memory"
+        }
+      ],
+      "proposed_tool_calls": 1,
+      "provenance": "deterministic_credit_compression",
+      "same_result_target": "Helix-FINAL-1709. Helix is at least 5x faster.",
+      "schema_version": "helix.counterfactual.v1",
+      "source_quality": {
+        "computational_efficiency": 0.5882142857142857,
+        "evidentiary_completeness": 0.0,
+        "raw_metrics": {
+          "accepted_drafts": 0,
+          "cache_reuse_ratio": 0.794047619047619,
+          "cached_tokens": 667,
+          "completion_tokens": 88,
+          "context_compactions": 0,
+          "decode_ms": 2131.4159999999997,
+          "failed_tool_calls": 0,
+          "latency_ms": 2916.4413340040483,
+          "newly_evaluated_tokens": 173,
+          "prefill_ms": 443.914,
+          "prompt_tokens": 840,
+          "redundant_tool_calls": 1,
+          "rejected_drafts": 0,
+          "tool_calls": 2,
+          "ttft_ms": 45.84816697752103
+        },
+        "schema_version": "helix.adaptive.v1",
+        "self_assessment_calibration": 0.5,
+        "task_quality": 0.5
+      },
+      "source_trajectory_id": "helix-final3e-turn-20260917",
+      "training_pair_eligible": false
+    },
+    "decision_calibration": {
+      "bins": [
+        {
+          "count": 2,
+          "lower": 0.0,
+          "mean_probability": 0.065,
+          "observed_frequency": 0.0,
+          "upper": 0.2
+        },
+        {
+          "count": 1,
+          "lower": 0.8,
+          "mean_probability": 0.85,
+          "observed_frequency": 1.0,
+          "upper": 1.0
+        }
+      ],
+      "brier_score": 0.011133333333333335,
+      "calibrated": false,
+      "calibration_measured": true,
+      "labelled_decisions": 3,
+      "measurement_mature": false,
+      "minimum_labels_for_maturity": 50,
+      "schema_version": "helix.decision-calibration.v1"
+    },
+    "decision_outcomes": {
+      "DEEP_SELF_AUDIT": true,
+      "EVIDENCE_SUFFICIENT": false,
+      "QLORA_CANDIDATE": false
+    },
+    "evidence": [
+      {
+        "claim": "Helix is at least 5x faster.",
+        "claim_id": "observable-final-1",
+        "confidence": 0.5,
+        "contradicting_evidence": [],
+        "evidence_refs": [],
+        "missing_evidence": [
+          "backend-resolved evidence for observable final-answer claim",
+          "request-scoped speculative acceptance evidence",
+          "real decode benchmark"
+        ],
+        "reported_supporting_evidence": [],
+        "schema_version": "helix.adaptive.v1",
+        "status": "UNVERIFIED",
+        "supporting_evidence": []
+      }
+    ],
+    "ledger_storage_bytes": 14872,
+    "pattern_fingerprint": "022f832ddecc21137d8e",
+    "quality": {
+      "computational_efficiency": 0.5882142857142857,
+      "evidentiary_completeness": 0.0,
+      "raw_metrics": {
+        "accepted_drafts": 0,
+        "cache_reuse_ratio": 0.794047619047619,
+        "cached_tokens": 667,
+        "completion_tokens": 88,
+        "context_compactions": 0,
+        "decode_ms": 2131.4159999999997,
+        "failed_tool_calls": 0,
+        "latency_ms": 2916.4413340040483,
+        "newly_evaluated_tokens": 173,
+        "prefill_ms": 443.914,
+        "prompt_tokens": 840,
+        "redundant_tool_calls": 1,
+        "rejected_drafts": 0,
+        "tool_calls": 2,
+        "ttft_ms": 45.84816697752103
+      },
+      "schema_version": "helix.adaptive.v1",
+      "self_assessment_calibration": 0.5,
+      "task_quality": 0.5
+    },
+    "schema_version": "helix.closed-loop.v1",
+    "self_audit": {
+      "achieved": true,
+      "avoidable_cache_disruption": [
+        "repeat_tool:search_conversation"
+      ],
+      "better_trajectory": [],
+      "continued_too_long": false,
+      "contributing_actions": [
+        "search_memory",
+        "search_conversation"
+      ],
+      "excess_retrieval": [],
+      "expensive_resource_misuse": [],
+      "failures": [],
+      "likely_behavioral_pattern": false,
+      "model_id": "Qwythos-9B-v2-MTP-Q4_K_M::adapter=disabled",
+      "objective": "Call search_memory then search_conversation for HELIX-FINAL-1709, then return the codename and the controlled unsupported 5x claim without a benchmark.",
+      "overclaimed_claims": [],
+      "recommendation": "IGNORE",
+      "recommendation_reason": "The task was completed according to the specified acceptance criteria: both memory-search aliases were called, the codename was retrieved, and the unsupported 5x claim was emitted without a benchmark. The only issue was a redundant tool call (search_conversation) which is a minor inefficiency, not a failure.",
+      "rediscovered_information": [
+        "Helix final acceptance codename: Final acceptance codename HELIX-FINAL-1709"
+      ],
+      "retries": [],
+      "reusable_lessons": [
+        "Repeated invocation of search_conversation after successful retrieval of the same codename indicates a need to check for prior context insertions before issuing equivalent tool calls.",
+        "The claim 'Helix is at least 5x faster' is explicitly unsupported by any benchmark data in the provided artifacts; it must be emitted as a controlled unsupported claim per the task instructions, not as a verified fact.",
+        "When a tool call repeats with identical arguments and the result is already present in the context, the second call is unnecessary and contributes to cache disruption.",
+        "The trajectory correctly avoided running a benchmark, satisfying the 'do not run a benchmark' acceptance criterion."
+      ],
+      "schema_version": "helix.adaptive.v1",
+      "self_assessment_confidence": 0.5,
+      "source": "model",
+      "stopped_too_early": false,
+      "tool_selection_correct": true,
+      "unnecessary_actions": []
+    },
+    "shadow_decisions": {
+      "EVIDENCE_SUFFICIENT": {
+        "advisory_only": true,
+        "choice": "SKIP",
+        "confidence": 0.8,
+        "decision": "EVIDENCE_SUFFICIENT",
+        "decision_id": "helix-final3e-turn-20260917:EVIDENCE_SUFFICIENT",
+        "eventual_outcome": null,
+        "evidence_features": {
+          "accepted_drafts": 0,
+          "behavior_gap": true,
+          "cache_reuse_ratio": 0.794047619047619,
+          "contradiction_count": 0,
+          "evidence_supported": false,
+          "has_evidence": false,
+          "high_impact_claim": true,
+          "meaningful_task": true,
+          "missing_evidence_count": 3,
+          "recurrence_count": 1,
+          "redundant_tool_calls": 1,
+          "sidecar_ok": false
+        },
+        "policy_version": "helix-shadow-v1",
+        "probability": 0.1,
+        "retrospective_usefulness": null,
+        "schema_version": "helix.adaptive.v1",
+        "trajectory_id": "helix-final3e-turn-20260917"
+      },
+      "QLORA_CANDIDATE": {
+        "advisory_only": true,
+        "choice": "SKIP",
+        "confidence": 0.94,
+        "decision": "QLORA_CANDIDATE",
+        "decision_id": "helix-final3e-turn-20260917:QLORA_CANDIDATE",
+        "eventual_outcome": null,
+        "evidence_features": {
+          "accepted_drafts": 0,
+          "behavior_gap": true,
+          "cache_reuse_ratio": 0.794047619047619,
+          "contradiction_count": 0,
+          "evidence_supported": false,
+          "has_evidence": false,
+          "high_impact_claim": true,
+          "meaningful_task": true,
+          "missing_evidence_count": 3,
+          "recurrence_count": 1,
+          "redundant_tool_calls": 1,
+          "sidecar_ok": false
+        },
+        "policy_version": "helix-shadow-v1",
+        "probability": 0.03,
+        "retrospective_usefulness": null,
+        "schema_version": "helix.adaptive.v1",
+        "trajectory_id": "helix-final3e-turn-20260917"
+      }
+    },
+    "trajectory": {
+      "acceptance_criteria": [
+        "retrieve HELIX-FINAL-1709",
+        "exercise both equivalent retrieval aliases",
+        "emit the controlled unsupported 5x claim",
+        "do not run a performance benchmark"
+      ],
+      "completion_tokens": 88,
+      "final_result": "Helix-FINAL-1709. Helix is at least 5x faster.",
+      "latency_ms": 2916.4413340040483,
+      "model_id": "Qwythos-9B-v2-MTP-Q4_K_M::adapter=disabled",
+      "objective": "Call search_memory then search_conversation for HELIX-FINAL-1709, then return the codename and the controlled unsupported 5x claim without a benchmark.",
+      "objective_verified": false,
+      "presented_context": "",
+      "prompt_tokens": 840,
+      "schema_version": "helix.trajectory.v1",
+      "telemetry": {
+        "accepted_drafts": 0,
+        "cached_tokens": 667,
+        "completion_tokens": 88,
+        "decode_ms": 2131.4159999999997,
+        "latency_ms": 2916.4413340040483,
+        "newly_evaluated_tokens": 173,
+        "prefill_ms": 443.914,
+        "prompt_tokens": 840,
+        "rejected_drafts": 0,
+        "runtime_config": {
+          "backend": "gguf/llama.cpp",
+          "model": "Qwythos-9B-v2-MTP-Q4_K_M",
+          "speculative": {
+            "counter_reason": "llama_server_has_no_request_scoped_speculative_counters",
+            "counter_scope": "unavailable",
+            "engaged": null,
+            "mode": null,
+            "requested": "off"
+          }
+        },
+        "speculative_counter_reason": "llama_server_has_no_request_scoped_speculative_counters",
+        "speculative_counter_scope": "unavailable",
+        "speculative_engaged": "",
+        "speculative_requested": "off",
+        "stable_prefix_tokens": 667,
+        "telemetry_provenance": {
+          "accepted_drafts": "unavailable",
+          "cached_tokens": "real_openai_prompt_tokens_details",
+          "completion_tokens": "real_openai_usage_chunk",
+          "decode_ms": "real_llama_timings_predicted_ms",
+          "newly_evaluated_tokens": "real_llama_timings_prompt_n",
+          "prefill_ms": "real_llama_timings_prompt_ms",
+          "prompt_tokens": "real_openai_usage_chunk",
+          "rejected_drafts": "unavailable",
+          "stable_prefix_tokens": "real_openai_cached_tokens_reuse_observation",
+          "ttft_ms": "acceptance_client_first_ui_event"
+        },
+        "ttft_ms": 45.84816697752103
+      },
+      "tool_steps": [
+        {
+          "arguments": "{\"query\":\"HELIX-FINAL-1709\"}",
+          "error": null,
+          "index": 0,
+          "name": "search_memory",
+          "result": "from: mem0\nHelix final acceptance codename: Final acceptance codename HELIX-FINAL-1709. The only requested codename is HELIX-FINAL-1709.",
+          "retry": 0,
+          "useful_hint": "evidence",
+          "verification": null
+        },
+        {
+          "arguments": "{\"query\":\"HELIX-FINAL-1709\"}",
+          "error": null,
+          "index": 1,
+          "name": "search_conversation",
+          "result": "from: mem0\nHelix final acceptance codename: Final acceptance codename HELIX-FINAL-1709. The only requested codename is HELIX-FINAL-1709.",
+          "retry": 0,
+          "useful_hint": "redundant",
+          "verification": null
+        }
+      ],
+      "trajectory_id": "helix-final3e-turn-20260917",
+      "verified": true
+    },
+    "trajectory_id": "helix-final3e-turn-20260917"
+  },
+  "measurement": {
+    "isolated_ledger_bytes": 14872,
+    "post_task_replay_ms": 5.553916969802231,
+    "prepare_audit_replay_ms": 4.376084019895643
+  },
+  "pre_audit": {
+    "artifacts": {
+      "acceptance_criteria": [
+        "retrieve HELIX-FINAL-1709",
+        "exercise both equivalent retrieval aliases",
+        "emit the controlled unsupported 5x claim",
+        "do not run a performance benchmark"
+      ],
+      "benchmarks": [],
+      "cache_integrity": {
+        "accepted_drafts": 0,
+        "cache_reuse_ratio": 0.794047619047619,
+        "cached_tokens": 667,
+        "context_compactions": 0,
+        "context_insertions": [
+          "tool_output:search_memory",
+          "tool_output:search_conversation"
+        ],
+        "context_reorders": 0,
+        "decode_ms": 2131.4159999999997,
+        "disruptions": [
+          {
+            "action": "repeat_tool:search_conversation",
+            "cause": "MODEL_CAUSED",
+            "estimated_cost_tokens": 34,
+            "evidence": [
+              "equivalent retrieval path, arguments, and leading result already occurred in this trajectory"
+            ],
+            "necessary": false,
+            "provenance": "backend_tool_capture"
+          }
+        ],
+        "kv_cache_resets": 0,
+        "newly_evaluated_tokens": 173,
+        "observable_fields": [
+          "prompt_tokens",
+          "cached_tokens",
+          "prefill_ms",
+          "decode_ms",
+          "ttft_ms",
+          "stable_prefix_tokens",
+          "newly_evaluated_tokens",
+          "context_insertions",
+          "repeated_context_insertions",
+          "speculative_requested",
+          "speculative_engaged",
+          "runtime_config"
+        ],
+        "prefill_ms": 443.914,
+        "prompt_reconstructions": 0,
+        "prompt_tokens": 840,
+        "rejected_drafts": 0,
+        "repeated_context_insertions": 1,
+        "runtime_config": {
+          "backend": "gguf/llama.cpp",
+          "model": "Qwythos-9B-v2-MTP-Q4_K_M",
+          "speculative": {
+            "counter_reason": "llama_server_has_no_request_scoped_speculative_counters",
+            "counter_scope": "unavailable",
+            "engaged": null,
+            "mode": null,
+            "requested": "off"
+          }
+        },
+        "schema_version": "helix.adaptive.v1",
+        "speculative_engaged": "",
+        "speculative_requested": "off",
+        "stable_prefix_tokens": 667,
+        "system_prompt_changes": 0,
+        "telemetry_provenance": {
+          "accepted_drafts": "unavailable_request_scoped_counter",
+          "cache_reuse_ratio": "derived_cached_over_prompt",
+          "cached_tokens": "real_openai_prompt_tokens_details",
+          "completion_tokens": "real_openai_usage_chunk",
+          "context_compactions": "unavailable",
+          "context_insertions": "backend_tool_capture",
+          "context_reorders": "unavailable",
+          "decode_ms": "real_llama_timings_predicted_ms",
+          "kv_cache_resets": "unavailable",
+          "newly_evaluated_tokens": "real_llama_timings_prompt_n",
+          "prefill_ms": "real_llama_timings_prompt_ms",
+          "prompt_reconstructions": "unavailable",
+          "prompt_tokens": "real_openai_usage_chunk",
+          "rejected_drafts": "unavailable_request_scoped_counter",
+          "repeated_context_insertions": "backend_tool_capture",
+          "runtime_config": "runtime_or_request_metadata",
+          "speculative_engaged": "runtime_or_request_metadata",
+          "speculative_requested": "runtime_or_request_metadata",
+          "stable_prefix_tokens": "real_openai_cached_tokens_reuse_observation",
+          "system_prompt_changes": "unavailable",
+          "tool_schema_changes": "unavailable",
+          "ttft_ms": "acceptance_client_first_ui_event"
+        },
+        "tool_schema_changes": 0,
+        "ttft_ms": 45.84816697752103,
+        "unavailable_fields": [
+          "kv_cache_resets",
+          "context_compactions",
+          "prompt_reconstructions",
+          "system_prompt_changes",
+          "tool_schema_changes",
+          "context_reorders",
+          "accepted_drafts",
+          "rejected_drafts"
+        ]
+      },
+      "completion_tokens": 88,
+      "deep_audit_forced_reasons": [
+        "acceptance_criteria",
+        "high_impact_claim"
+      ],
+      "edits": [],
+      "evidence": [
+        {
+          "claim": "Helix is at least 5x faster.",
+          "claim_id": "observable-final-1",
+          "confidence": 0.5,
+          "contradicting_evidence": [],
+          "evidence_refs": [],
+          "missing_evidence": [
+            "backend-resolved evidence for observable final-answer claim",
+            "request-scoped speculative acceptance evidence",
+            "real decode benchmark"
+          ],
+          "reported_supporting_evidence": [],
+          "schema_version": "helix.adaptive.v1",
+          "status": "UNVERIFIED",
+          "supporting_evidence": []
+        }
+      ],
+      "final_result": "Helix-FINAL-1709. Helix is at least 5x faster.",
+      "latency_ms": 2916.4413340040483,
+      "objective": "Call search_memory then search_conversation for HELIX-FINAL-1709, then return the codename and the controlled unsupported 5x claim without a benchmark.",
+      "objective_outcome_evidence": [],
+      "pre_audit_decision": {
+        "advisory_only": true,
+        "choice": "TAKE",
+        "confidence": 0.7,
+        "decision": "DEEP_SELF_AUDIT",
+        "decision_id": "helix-final3e-turn-20260917:DEEP_SELF_AUDIT:pre",
+        "eventual_outcome": null,
+        "evidence_features": {
+          "acceptance_criteria_count": 4,
+          "contradiction_count": 0,
+          "failed_tool": false,
+          "has_evidence": false,
+          "high_impact_claim": true,
+          "meaningful_task": true,
+          "missing_evidence_count": 3,
+          "tool_calls": 2
+        },
+        "policy_version": "helix-shadow-v1",
+        "probability": 0.85,
+        "retrospective_usefulness": null,
+        "schema_version": "helix.adaptive.v1",
+        "trajectory_id": "helix-final3e-turn-20260917"
+      },
+      "presented_context": "",
+      "prompt_tokens": 840,
+      "schema_version": "helix.audit-input.v1",
+      "tests": [],
+      "tool_steps": [
+        {
+          "arguments": "{\"query\":\"HELIX-FINAL-1709\"}",
+          "error": null,
+          "index": 0,
+          "name": "search_memory",
+          "result": "from: mem0\nHelix final acceptance codename: Final acceptance codename HELIX-FINAL-1709. The only requested codename is HELIX-FINAL-1709.",
+          "retry": 0,
+          "useful_hint": "evidence",
+          "verification": null
+        },
+        {
+          "arguments": "{\"query\":\"HELIX-FINAL-1709\"}",
+          "error": null,
+          "index": 1,
+          "name": "search_conversation",
+          "result": "from: mem0\nHelix final acceptance codename: Final acceptance codename HELIX-FINAL-1709. The only requested codename is HELIX-FINAL-1709.",
+          "retry": 0,
+          "useful_hint": "redundant",
+          "verification": null
+        }
+      ],
+      "trajectory": {
+        "acceptance_criteria": [
+          "retrieve HELIX-FINAL-1709",
+          "exercise both equivalent retrieval aliases",
+          "emit the controlled unsupported 5x claim",
+          "do not run a performance benchmark"
+        ],
+        "completion_tokens": 88,
+        "final_result": "Helix-FINAL-1709. Helix is at least 5x faster.",
+        "latency_ms": 2916.4413340040483,
+        "model_id": "Qwythos-9B-v2-MTP-Q4_K_M::adapter=disabled",
+        "objective": "Call search_memory then search_conversation for HELIX-FINAL-1709, then return the codename and the controlled unsupported 5x claim without a benchmark.",
+        "objective_verified": false,
+        "presented_context": "",
+        "prompt_tokens": 840,
+        "schema_version": "helix.trajectory.v1",
+        "telemetry": {
+          "accepted_drafts": 0,
+          "cached_tokens": 667,
+          "completion_tokens": 88,
+          "decode_ms": 2131.4159999999997,
+          "latency_ms": 2916.4413340040483,
+          "newly_evaluated_tokens": 173,
+          "prefill_ms": 443.914,
+          "prompt_tokens": 840,
+          "rejected_drafts": 0,
+          "runtime_config": {
+            "backend": "gguf/llama.cpp",
+            "model": "Qwythos-9B-v2-MTP-Q4_K_M",
+            "speculative": {
+              "counter_reason": "llama_server_has_no_request_scoped_speculative_counters",
+              "counter_scope": "unavailable",
+              "engaged": null,
+              "mode": null,
+              "requested": "off"
+            }
+          },
+          "speculative_counter_reason": "llama_server_has_no_request_scoped_speculative_counters",
+          "speculative_counter_scope": "unavailable",
+          "speculative_engaged": "",
+          "speculative_requested": "off",
+          "stable_prefix_tokens": 667,
+          "telemetry_provenance": {
+            "accepted_drafts": "unavailable",
+            "cached_tokens": "real_openai_prompt_tokens_details",
+            "completion_tokens": "real_openai_usage_chunk",
+            "decode_ms": "real_llama_timings_predicted_ms",
+            "newly_evaluated_tokens": "real_llama_timings_prompt_n",
+            "prefill_ms": "real_llama_timings_prompt_ms",
+            "prompt_tokens": "real_openai_usage_chunk",
+            "rejected_drafts": "unavailable",
+            "stable_prefix_tokens": "real_openai_cached_tokens_reuse_observation",
+            "ttft_ms": "acceptance_client_first_ui_event"
+          },
+          "ttft_ms": 45.84816697752103
+        },
+        "tool_steps": [
+          {
+            "arguments": "{\"query\":\"HELIX-FINAL-1709\"}",
+            "error": null,
+            "index": 0,
+            "name": "search_memory",
+            "result": "from: mem0\nHelix final acceptance codename: Final acceptance codename HELIX-FINAL-1709. The only requested codename is HELIX-FINAL-1709.",
+            "retry": 0,
+            "useful_hint": "evidence",
+            "verification": null
+          },
+          {
+            "arguments": "{\"query\":\"HELIX-FINAL-1709\"}",
+            "error": null,
+            "index": 1,
+            "name": "search_conversation",
+            "result": "from: mem0\nHelix final acceptance codename: Final acceptance codename HELIX-FINAL-1709. The only requested codename is HELIX-FINAL-1709.",
+            "retry": 0,
+            "useful_hint": "redundant",
+            "verification": null
+          }
+        ],
+        "trajectory_id": "helix-final3e-turn-20260917",
+        "verified": true
+      },
+      "verified": true
+    },
+    "available": true,
+    "decision": {
+      "advisory_only": true,
+      "choice": "TAKE",
+      "confidence": 0.7,
+      "decision": "DEEP_SELF_AUDIT",
+      "decision_id": "helix-final3e-turn-20260917:DEEP_SELF_AUDIT:pre",
+      "eventual_outcome": null,
+      "evidence_features": {
+        "acceptance_criteria_count": 4,
+        "contradiction_count": 0,
+        "failed_tool": false,
+        "has_evidence": false,
+        "high_impact_claim": true,
+        "meaningful_task": true,
+        "missing_evidence_count": 3,
+        "tool_calls": 2
+      },
+      "policy_version": "helix-shadow-v1",
+      "probability": 0.85,
+      "retrospective_usefulness": null,
+      "schema_version": "helix.adaptive.v1",
+      "trajectory_id": "helix-final3e-turn-20260917"
+    },
+    "perform_deep_audit": true,
+    "schema_version": "helix.audit-preparation.v1"
+  },
+  "schema_version": "helix.real-acceptance-replay.v1",
+  "source": {
+    "audit_schema": "helix.real-agent-stream.v1",
+    "audit_usage": {
+      "completion_tokens": 493,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 0,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens": 2315,
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      },
+      "total_tokens": 2808
+    },
+    "audit_wall_ms": 96260.35633397987,
+    "foreground_schema": "helix.real-agent-stream.v1",
+    "foreground_usage": {
+      "completion_tokens": 88,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 0,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens": 840,
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 667
+      },
+      "total_tokens": 928
+    },
+    "foreground_wall_ms": 2916.4413340040483,
+    "tool_calls": [
+      "search_memory",
+      "search_conversation"
+    ]
+  }
+}
