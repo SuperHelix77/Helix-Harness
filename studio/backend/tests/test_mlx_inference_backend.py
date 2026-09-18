@@ -400,6 +400,59 @@ def test_mlx_base_fusion_lifetime_and_lora_request_scope(monkeypatch, mlx_moe, i
     )
 
 
+def test_mlx_text_checkpoint_forced_through_vlm_uses_vlm_runtime_without_media(monkeypatch):
+    """A text-facing checkpoint may require mlx-vlm for its architecture."""
+    from core.inference import mlx_inference
+    from core.inference.mlx_inference import MLXInferenceBackend
+
+    _install_fake_mlx(monkeypatch)
+    calls = []
+    _install_fake_fast_mlx(monkeypatch, calls)
+    loader = sys.modules["unsloth_zoo.mlx.loader"].FastMLXModel
+
+    tokenizer = _DummyTokenizer()
+    processor = SimpleNamespace(tokenizer=tokenizer)
+    model = _DummyModel()
+    model._is_vlm_model = True
+    model._unsloth_text_only_vlm = True
+    model._processor = processor
+    monkeypatch.setattr(
+        loader,
+        "from_pretrained",
+        staticmethod(lambda *args, **kwargs: (model, tokenizer)),
+    )
+
+    backend = MLXInferenceBackend()
+    monkeypatch.setattr(
+        backend,
+        "_resolve_kv_policy",
+        lambda *_a, **_k: (
+            mlx_inference._kv_quant_status(None, None, False),
+            None,
+            False,
+        ),
+    )
+    config = SimpleNamespace(identifier="fake/qwen38", is_vision=False, is_lora=False)
+
+    assert backend.load_model(config) is True
+    assert backend._is_vlm is True
+    assert backend._text_only_vlm is True
+    assert backend._accepts_media is False
+    assert backend._processor is processor
+    assert backend._tokenizer is tokenizer
+    assert backend.models[config.identifier]["is_vision"] is False
+    assert backend.models[config.identifier]["chat_template_info"]["renders_image"] is False
+
+    with pytest.raises(RuntimeError, match="text-only.*images"):
+        next(
+            backend.generate_chat_response(
+                messages=[{"role": "user", "content": "hi"}],
+                image=object(),
+                max_new_tokens=1,
+            )
+        )
+
+
 def test_mlx_text_lora_record_keeps_base_model_for_native_template(monkeypatch):
     # A LoRA adapter's own tokenizer often ships no chat template; the native tool-calling template
     # lives on the base model.

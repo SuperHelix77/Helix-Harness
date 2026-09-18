@@ -2200,6 +2200,11 @@ class MLXInferenceBackend:
         self._tokenizer = None
         self._processor = None
         self._is_vlm = False
+        self._text_only_vlm = False
+        # None means runtime capability has not been resolved by load_model yet.
+        # This preserves the historical behavior of lightweight test doubles that
+        # set only _is_vlm=True while real loaded models always receive True/False.
+        self._accepts_media = None
         self._config = {}
         self._distributed_group = None
         self._distributed_rank = 0
@@ -2993,18 +2998,38 @@ class MLXInferenceBackend:
             **load_kwargs,
         )
 
-        if is_vision:
-            processor = tokenizer_or_processor
+        # FastMLXModel may deliberately route a nominally text-only checkpoint
+        # through mlx-vlm when mlx-lm does not implement that architecture yet.
+        # Trust the loader's runtime marker for cache/generation semantics while
+        # keeping user-facing media capability separate.
+        runtime_vlm = bool(getattr(model, "_is_vlm_model", False)) or bool(is_vision)
+        text_only_vlm = bool(getattr(model, "_unsloth_text_only_vlm", False))
+        if runtime_vlm:
+            processor = getattr(model, "_processor", None)
+            if processor is None and is_vision:
+                processor = tokenizer_or_processor
+            if processor is None:
+                raise RuntimeError(
+                    "FastMLXModel selected mlx-vlm but did not retain its processor"
+                )
             self._model = model
             self._processor = processor
-            self._tokenizer = getattr(processor, "tokenizer", processor)
+            self._tokenizer = (
+                tokenizer_or_processor
+                if text_only_vlm
+                else getattr(processor, "tokenizer", processor)
+            )
             self._is_vlm = True
+            self._text_only_vlm = text_only_vlm
+            self._accepts_media = bool(is_vision and not text_only_vlm)
         else:
             tokenizer = tokenizer_or_processor
             self._model = model
             self._tokenizer = tokenizer
             self._processor = None
             self._is_vlm = False
+            self._text_only_vlm = False
+            self._accepts_media = False
 
         self._load_mlx_speculative_draft(
             speculative_type,
@@ -3027,7 +3052,7 @@ class MLXInferenceBackend:
         # Classify before the first generation: an ineligible cache would otherwise raise inside
         # maybe_quantize_kv_cache mid-stream, after converting the leading entries.
         self._kv_quant, self._kv_cache_window, _ctx_enforced = self._resolve_kv_policy(
-            is_vision, kv_bits, max_seq_length, _served_ctx
+            self._is_vlm, kv_bits, max_seq_length, _served_ctx
         )
         if self._kv_quant["kv_bits"] is not None:
             logger.info(
@@ -3051,7 +3076,7 @@ class MLXInferenceBackend:
             chat_template_override,
             self._tokenizer,
             self._processor,
-            lambda: self._render_template_probe(is_vision),
+            lambda: self._render_template_probe(self._is_vlm),
         )
         if native_marks_audio:
             _revoke_override_that_drops_audio(self._template_override, self._processor, self._model)
@@ -3185,7 +3210,10 @@ class MLXInferenceBackend:
         )
         if isinstance(_proc_tpl, (str, dict, list, tuple)) and _proc_tpl:
             info["processor_template"] = _proc_tpl
-        info["renders_image"] = _proc is not None and bool(getattr(self, "_is_vlm", False))
+        _accepts_media = getattr(self, "_accepts_media", None)
+        info["renders_image"] = _proc is not None and bool(
+            self._is_vlm if _accepts_media is None else _accepts_media
+        )
         try:
             tpl = (
                 getattr(tok, "chat_template", None)
@@ -3224,6 +3252,9 @@ class MLXInferenceBackend:
         self._model = None
         self._tokenizer = None
         self._processor = None
+        self._is_vlm = False
+        self._text_only_vlm = False
+        self._accepts_media = None
         self._spec_draft = None
         self._spec_draft_model_path = None
         self._spec_draft_n_max = None
@@ -3380,11 +3411,18 @@ class MLXInferenceBackend:
     ) -> Generator[str, None, None]:
         if self._model is None:
             raise RuntimeError("No model loaded")
+        _accepts_media = (
+            self._is_vlm if self._accepts_media is None else self._accepts_media
+        )
+        if image is not None and not _accepts_media:
+            raise RuntimeError("The loaded model is text-only and does not read images.")
         if video is not None:
             if not _mlx_vlm_decodes_video():
                 raise RuntimeError("The installed mlx-vlm does not read video.")
-            if not self._is_vlm:
-                raise RuntimeError("The loaded model does not read video.")
+            if not _accepts_media:
+                if not self._is_vlm:
+                    raise RuntimeError("The loaded model does not read video.")
+                raise RuntimeError("The loaded model is text-only and does not read video.")
 
         # Reset so a failed run cannot surface stale stats.
         self.last_generation_stats = None
@@ -4506,7 +4544,8 @@ class MLXInferenceBackend:
             active_name = info.get("active_adapter")
             if use_adapter != active_name:
                 raise NotImplementedError(
-                    "Unsloth MLX: only the currently hot-swapped adapter may be "
+                    "Unsloth MLX: named adapter selection only supports the currently "
+                    "hot-swapped adapter; "
                     f"selected by name (requested={use_adapter!r}, active={active_name!r})."
                 )
             adapter_state = True
