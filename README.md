@@ -151,6 +151,10 @@ Chat is the product. Memory, skills, learning, and the execution graph stay avai
 - **Model choice** lives in the composer (`Select model`) and the **Model hub**. Pick local or frontier reasoning per task.
 - **Helix Engine** keeps memory, execution, and learning in the same lifecycle. They are built in, not optional sidecars.
 
+<p align="center">
+  <img src="docs/images/helix-v3-engine.png" alt="Helix Harness v3 — Helix Engine execution graph and evidence" width="100%">
+</p>
+
 ---
 
 ## Who's underneath
