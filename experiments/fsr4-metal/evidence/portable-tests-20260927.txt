@@ -53,6 +53,13 @@ test_multiple_tables_reported_not_hidden (test_fsr4_extraction.Manifest.test_mul
 test_shape_is_never_claimed (test_fsr4_extraction.Manifest.test_shape_is_never_claimed) ... ok
 test_extraction_tools_do_not_write_weights (test_fsr4_extraction.NothingVendored.test_extraction_tools_do_not_write_weights) ... ok
 test_no_dll_and_no_large_blobs_in_the_repo (test_fsr4_extraction.NothingVendored.test_no_dll_and_no_large_blobs_in_the_repo) ... ok
+test_decodes_module_block_id (test_llvm_bitstream.BitstreamBasics.test_decodes_module_block_id) ... ok
+test_reads_abbrev_width (test_llvm_bitstream.BitstreamBasics.test_reads_abbrev_width) ... ok
+test_rejects_non_bitstream (test_llvm_bitstream.BitstreamBasics.test_rejects_non_bitstream) ... ok
+test_width_is_not_base128 (test_llvm_bitstream.BitstreamBasics.test_width_is_not_base128)
+A 2-bit-width stream is a different encoding from base-128. ... ok
+test_large_value_roundtrips (test_llvm_bitstream.VBRWidthSemantics.test_large_value_roundtrips) ... ok
+test_multibyte_value_roundtrips (test_llvm_bitstream.VBRWidthSemantics.test_multibyte_value_roundtrips) ... ok
 test_every_half_bit_round_trips_through_float (test_precision_arena.HalfRoundTrip.test_every_half_bit_round_trips_through_float) ... ok
 test_exact_small_values (test_precision_arena.HalfRoundTrip.test_exact_small_values) ... ok
 test_negative_zero_preserved (test_precision_arena.HalfRoundTrip.test_negative_zero_preserved) ... ok
@@ -95,6 +102,6 @@ test_random_roundtrip (test_weight_codec.WeightCodecTests.test_random_roundtrip)
 test_truncation_and_extra_data (test_weight_codec.WeightCodecTests.test_truncation_and_extra_data) ... ok
 
 ----------------------------------------------------------------------
-Ran 87 tests in 0.054s
+Ran 93 tests in 0.052s
 
 OK
