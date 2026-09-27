@@ -49,25 +49,10 @@ This is a structure read, not a decompilation. Specifically:
 - **No per-tensor element format confirmed.** FP8 is indicated by the model
   names, but has not been verified per tensor.
 
-## Why shapes are the blocker, and the route to them
+## The layer graph (recovered after the manifest)
 
-A Metal port needs, per tensor: shape, dtype, and the order tensors are
-consumed in. The first is the blocker. Three routes, in increasing cost:
-
-1. **Derive shapes from sizes.** Viable only if the layout assumptions are
-   right. Current evidence: the sizes do not factor as `k*C*C` for
-   C in {64,128,256}, so either the layout is NCHW, or scales/biases are
-   interleaved with the weights, or the element size is not 1 byte. Resolving
-   this needs one known tensor to calibrate against.
-2. **Read the DXIL.** Each pass's shader declares its bindings and the
-   constants it uses. This yields shapes and order directly, at the cost of
-   5,176 shader disassembly passes. Expensive but mechanical.
-3. **Find a known FSR4 v07 model definition.** It exists in the wild as
-   community reverse-engineering work, but it is third-party and unverified,
-   so it could only be used as a hypothesis to test, never as ground truth.
-
-Route 2 is the honest one: it derives the answer from the artifact rather than
-from someone's claim about it.
+See below for the graph result, which arrived after this section was first
+written.
 
 ## Standing position
 
@@ -76,3 +61,48 @@ project owner has accepted that risk and directed extraction. Nothing is
 vendored into this repository, no weight bytes are written to disk, and the
 binary is not executed. This document records what was learned about the
 artifact's structure; it is not a licence to ship.
+
+---
+
+## Update: the layer graph, recovered
+
+The manifest above is the weight side. The graph side turned out to be
+recoverable too, and it changes the picture materially.
+
+| | 4K variant | 8K variant |
+|---|---:|---:|
+| layers | **191** | **191** |
+| index range | 0 - 190 | 0 - 190 |
+| contiguous | yes, no gaps | yes, no gaps |
+
+Every pass index from 0 to 190 is present in both variants, so the ordering is
+a fact read from the artifact rather than an inference: the network is a
+straight sequence of 191 layers with no conditional skips, and the 4K and 8K
+paths have identical topology.
+
+Supporting structure: 2,588 DXIL containers, each a complete program header
+with `SFI0` / `ISG1` / `OSG1` / `PSV0` sub-parts; 1,294 distinct signatures
+(about 6.8 compiled variants per layer); 382 layer names, matching
+191 x 2 exactly.
+
+This corrects an earlier impression. Reading the `fsr4_model_v07_*` strings
+suggests 13 passes. Those are shader labels and undercount the graph by more
+than an order of magnitude. The real network is **191 layers**.
+
+### Shapes are still missing, and the signature is not where they are
+
+The natural assumption was that the DXIL program signature would name resource
+dimensions. It does not. `PSV0` carries a referenced-resource table keyed by
+numeric register ID, and the only readable strings in the signature window are
+the container tags. There are no tensor names and no dimensions.
+
+The dimensions live in the **compiled DXIL instruction stream** as constants
+and typed-buffer strides. Recovering them means disassembling the bitcode,
+finding the cbuffer loads that set per-layer constants, and connecting those
+constants to the weight bindings.
+
+The useful part: once a few shapes are recovered that way, the remaining 479
+tensors can be **solved from the size table by elimination**, because the
+channel progression through a 191-layer network is heavily constrained. That
+turns a full 2,588-shader disassembly into a handful of real disassembly passes
+plus arithmetic against the sizes already extracted.

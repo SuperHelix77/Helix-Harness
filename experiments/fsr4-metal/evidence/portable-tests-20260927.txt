@@ -39,6 +39,20 @@ test_receipts_exist (test_fsr3metal.ReceiptHonesty.test_receipts_exist) ... ok
 test_kernels_reference_provenance (test_fsr3metal.SourceIntegrity.test_kernels_reference_provenance) ... ok
 test_no_amd_binaries_vendored (test_fsr3metal.SourceIntegrity.test_no_amd_binaries_vendored)
 The FSR4 DLL must never enter the repository. ... ok
+test_corrects_the_shader_label_misreading (test_fsr4_extraction.BinaryInventory.test_corrects_the_shader_label_misreading)
+The fsr4_model_v07_* strings are DXBC/DXIL labels, not weights. ... ok
+test_dxbc_shader_containers_dominate_rdata (test_fsr4_extraction.BinaryInventory.test_dxbc_shader_containers_dominate_rdata) ... ok
+test_identifies_the_vendor_product (test_fsr4_extraction.BinaryInventory.test_identifies_the_vendor_product) ... ok
+test_records_that_the_binary_was_never_executed (test_fsr4_extraction.BinaryInventory.test_records_that_the_binary_was_never_executed) ... ok
+test_layer_count_and_contiguity (test_fsr4_extraction.Graph.test_layer_count_and_contiguity) ... ok
+test_layer_names_match_layers_times_resolutions (test_fsr4_extraction.Graph.test_layer_names_match_layers_times_resolutions) ... ok
+test_same_binary_across_all_reports (test_fsr4_extraction.Graph.test_same_binary_across_all_reports) ... ok
+test_shapes_are_still_declared_unknown (test_fsr4_extraction.Graph.test_shapes_are_still_declared_unknown) ... ok
+test_manifest_looks_like_a_conv_net (test_fsr4_extraction.Manifest.test_manifest_looks_like_a_conv_net) ... ok
+test_multiple_tables_reported_not_hidden (test_fsr4_extraction.Manifest.test_multiple_tables_reported_not_hidden) ... ok
+test_shape_is_never_claimed (test_fsr4_extraction.Manifest.test_shape_is_never_claimed) ... ok
+test_extraction_tools_do_not_write_weights (test_fsr4_extraction.NothingVendored.test_extraction_tools_do_not_write_weights) ... ok
+test_no_dll_and_no_large_blobs_in_the_repo (test_fsr4_extraction.NothingVendored.test_no_dll_and_no_large_blobs_in_the_repo) ... ok
 test_every_half_bit_round_trips_through_float (test_precision_arena.HalfRoundTrip.test_every_half_bit_round_trips_through_float) ... ok
 test_exact_small_values (test_precision_arena.HalfRoundTrip.test_exact_small_values) ... ok
 test_negative_zero_preserved (test_precision_arena.HalfRoundTrip.test_negative_zero_preserved) ... ok
@@ -81,6 +95,6 @@ test_random_roundtrip (test_weight_codec.WeightCodecTests.test_random_roundtrip)
 test_truncation_and_extra_data (test_weight_codec.WeightCodecTests.test_truncation_and_extra_data) ... ok
 
 ----------------------------------------------------------------------
-Ran 74 tests in 0.047s
+Ran 87 tests in 0.054s
 
 OK
