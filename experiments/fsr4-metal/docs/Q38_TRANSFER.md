@@ -157,15 +157,31 @@ empty temporal coverage, train/dev/holdout scene overlap, and hidden worst-pixel
 or flicker regressions. It is a smoke test, not complete perceptual/HDR or live
 capture attestation; production-quality approval remains false.
 
+`kernels/precision_arena.metal` / `native/PrecisionLab.swift`: the FP16-vs-INT8
+baseline the previous version only proposed. On identical shapes and the same
+underlying values it measures INT8 (packed-four + dyadic epilogue), FP32, FP16
+with a half accumulator, FP16 with a float32 accumulator, and an 8x8
+`simdgroup` FP16 matrix path for 1x1. On this M3 Max the `simdgroup` path is
+~2.3-2.6x faster than INT8 on 1x1 but ~1.8-1.9x slower on 3x3, so a per-shape
+precision table is the right target; half accumulation was also shown to be
+numerically unsafe (max relative error ~1434x) while half storage with
+float32 accumulation stayed within 0.016 absolute. Absolute milliseconds on
+this host are NOT stable run to run (the GPU sits in one of two clock states
+2-4x apart), so only same-run ratios to INT8 are quoted. This selects a
+precision for synthetic 1x1; it does **not** choose a student's precision, and
+it says nothing about picture quality.
+
 ## Next executable research boundary
 
 Obtain a provenance-approved model/reference package and real layer/sequence
-fixtures. Run FP16 and INT8 native baselines on identical shapes; replace our
-synthetic dyadic epilogue with the actual documented model contract. Perform
-operator sensitivity and activation-lifetime profiling before choosing a
-student's width/precision. Build the smallest real resource/fence bridge proof
-independently. Never postpone all numerical work behind the bridge, or label
-native numerical success as proof that the bridge works.
+fixtures. The FP16/INT8 native baseline on identical shapes is **done**
+(`PRECISION_ARENA_VALIDATION.md`); the remaining steps are: replace our
+synthetic dyadic epilogue with the actual documented model contract; perform
+operator sensitivity and activation-lifetime profiling (still open) before
+choosing a student's width/precision; and build the smallest real
+resource/fence bridge proof independently. Never postpone all numerical work
+behind the bridge, or label native numerical success as proof that the bridge
+works.
 
 ## Primary sources
 

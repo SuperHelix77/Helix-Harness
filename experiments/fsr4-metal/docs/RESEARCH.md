@@ -82,6 +82,16 @@ reduce dispatches. Compare INT8 and FP16/matrix paths on this exact M3; never
 choose a format merely because it has fewer bits. Two bootstrap kernels both
 use INT8, so their comparison is a packing/layout experiment, not INT8 vs FP16.
 
+The INT8 vs FP16/matrix comparison has since been run on this exact M3
+(`evidence/PRECISION_ARENA_VALIDATION.md`): on identical shapes and values the
+8x8 `simdgroup` FP16 matrix path wins on 1x1 (~2.3-2.6x) and loses on 3x3
+(~1.8-1.9x), so specialization is by shape, and half accumulation is
+numerically unsafe while half storage with float32 accumulation is acceptable.
+Absolute milliseconds on this host are not stable run to run (two GPU clock
+states 2-4x apart), so only same-run ratios are quoted. That is a
+synthetic-operator result; real layer shapes and activations are still needed
+before any of it informs a model.
+
 **Second: reduce the model itself, only if the faithful implementation misses
 the frame budget.** Train/calibrate a narrower or pruned student against a
 proven teacher and temporal sequences. Preserve disocclusion handling and
@@ -99,7 +109,7 @@ first lane.** Super-resolution must first be correct and net beneficial.
 |---|---|---|
 | G0 provenance | exact permitted source + model lineage and hashes | open |
 | G1 arithmetic | signed INT8, padding, tails, stride and exact accumulation | primitive fixtures pass |
-| G2 model operators | bias, scales/zero points, rounding/clamping, activations, reshape/skip parity | open |
+| G2 model operators | bias, scales/zero points, rounding/clamping, activations, reshape/skip parity | open; our own dyadic contract passes, AMD's is unverified |
 | G3 native graph | complete pre/model/post path vs approved reference sequences | open |
 | G4 bridge | genuine game resources + GPU fence/lifetime proof | open |
 | G5 quality/speed | held-out sequence quality and total frame-time improvement | open |

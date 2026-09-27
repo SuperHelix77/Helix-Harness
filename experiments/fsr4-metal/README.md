@@ -77,6 +77,22 @@ not yet validated as an AMD model operator. The new sequence-metric tests detect
 rare-pixel, edge and temporal regressions on frozen normalized-SDR fixtures;
 they do not constitute real-game quality or HDR validation.
 
+The FP16/INT8 precision arena answers the question the plan had left open -
+whether an FP16 path beats the scalar INT8 path on this M3 - by measurement
+rather than bit count:
+
+```sh
+sh scripts/run_precision_lab.sh evidence/precision-new-run.json
+```
+
+On identical shapes and values it finds the 8x8 `simdgroup` FP16 matrix path
+~2.3-2.6x faster than INT8 on 1x1 but ~1.8-1.9x slower on 3x3, and shows that
+half accumulation is numerically unsafe (max relative error ~1434x) while half
+storage with float32 accumulation is not. Absolute milliseconds on this host
+are not stable run to run, so it reports and compares same-run ratios only.
+These are synthetic operators on this host; they select no student precision
+and assert no picture quality. See `evidence/PRECISION_ARENA_VALIDATION.md`.
+
 ## Integration boundary
 
 The future pipeline is game temporal inputs -> upscaler hook -> verified GPU
