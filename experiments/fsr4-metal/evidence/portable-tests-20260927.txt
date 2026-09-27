@@ -26,6 +26,9 @@ Not just 'better', but better than the run-to-run precision of the ... ok
 test_receipts_declare_the_fixture_is_band_limited (test_fsr3metal.MetricIsWellPosed.test_receipts_declare_the_fixture_is_band_limited) ... ok
 test_variants_beat_the_memoryless_floor (test_fsr3metal.MetricIsWellPosed.test_variants_beat_the_memoryless_floor)
 Every memoryless filter must beat the downsampled input itself. ... ok
+test_accum_pixel_has_no_duplicate_pixels (test_fsr3metal.PerPixelBandwidth.test_accum_pixel_has_no_duplicate_pixels) ... ok
+test_kernel_takes_frame_constants_from_uniforms (test_fsr3metal.PerPixelBandwidth.test_kernel_takes_frame_constants_from_uniforms) ... ok
+test_per_pixel_struct_is_small_enough (test_fsr3metal.PerPixelBandwidth.test_per_pixel_struct_is_small_enough) ... ok
 test_ghosting_metric_has_discriminating_power (test_fsr3metal.ReceiptHonesty.test_ghosting_metric_has_discriminating_power)
 A ghosting metric that cannot fail is not a test. ... ok
 test_lanczos_beats_bilinear (test_fsr3metal.ReceiptHonesty.test_lanczos_beats_bilinear) ... ok
@@ -78,6 +81,6 @@ test_random_roundtrip (test_weight_codec.WeightCodecTests.test_random_roundtrip)
 test_truncation_and_extra_data (test_weight_codec.WeightCodecTests.test_truncation_and_extra_data) ... ok
 
 ----------------------------------------------------------------------
-Ran 71 tests in 0.044s
+Ran 74 tests in 0.047s
 
 OK

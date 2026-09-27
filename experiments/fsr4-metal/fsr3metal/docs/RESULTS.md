@@ -94,32 +94,60 @@ possible smear), measurement on the last frame (the old dot has already left),
 and a control built from a lerp of background with background (which
 mathematically cannot exceed background). Only the third version can fail.
 
-## Performance, and it is not good enough
+## Performance: the miss, and then the fix
 
-Measured on this host with all variants interleaved per trial. Ratios are the
-durable number; absolute ms are not reproducible here (two clock states).
+### The miss
 
-| Output | spatial | +RCAS | full | full vs spatial | fps |
-|---|---:|---:|---:|---:|---:|
-| 1440p (3840x2160) | 0.89 ms | 1.88 ms | 5.84 ms | 6.6x | 171 |
-| 4K (7680x4320) | 3.49 ms | 7.57 ms | **23.24 ms** | 6.7x | **43** |
+The first measurement of the full pipeline, interleaved per trial:
 
-**The full pipeline does not fit a 60 fps budget at 4K.** 23.24 ms against a
-16.67 ms budget. It clears 4K at 43 fps, which is playable but not what the
-objective asks for.
+| Output | spatial | +RCAS | full | fps |
+|---|---:|---:|---:|---:|
+| 1440p (3840x2160) | 0.89 ms | 1.88 ms | 5.84 ms | 171 |
+| 4K (7680x4320) | 3.49 ms | 7.57 ms | **23.24 ms** | **43** |
 
-The cost is almost entirely the temporal stage: spatial 3.49 ms, +RCAS
-7.57 ms, +temporal 23.24 ms. The accumulate pass alone costs about 16 ms, and
-it is the obvious optimisation target. Two causes, both fixable:
+**23.24 ms against a 16.67 ms budget at 4K.** The temporal accumulate pass
+alone cost about 16 ms, and the arithmetic said why: it took a 96-byte
+per-pixel struct across all 33.2M pixels, streaming **3.19 GB per frame** to
+perform arithmetic that needs 64 bytes of real data per pixel. At an estimated
+400 GB/s that is 15.9 ms, which matched the measurement almost exactly. It was
+a bandwidth problem, not a maths problem.
 
-1. The accumulate kernel is dispatched over every upscale pixel with a
-   per-pixel struct of ~140 bytes of parameters, so the whole 33M-pixel
-   parameter buffer is streamed twice per frame (write, then read). That is
-   far more bandwidth than the arithmetic needs.
-2. RCAS is in-place, so spatial and RCAS cannot overlap.
+### The fix, in two steps
 
-Neither has been optimised yet. The numbers above are the honest starting
-point, not a result.
+**Split the frame-constant parameters out.** 32 of the 96 bytes (exposure,
+accumulation, reset, frame index) are identical for every pixel in a frame.
+They moved to a small uniform buffer that Metal broadcasts from constant memory
+rather than streaming. 4K full: **23.24 -> 20.05 ms**.
+
+**Stop duplicating resident pixels.** The struct also carried `currentColor`,
+which is literally the output of the previous pass and therefore already in
+device memory, and `historyColor`, which the caller has to reproject anyway.
+Both became separate buffer bindings. The per-pixel struct is now **32 bytes**
+(reactive signals, lock state, motion vector) and each pixel is read once.
+
+Result, 4K output, four consecutive runs:
+
+| run | full pipeline | fits 60 fps |
+|---|---:|---|
+| 1 | 13.69 ms | yes |
+| 2 | 13.34 ms | yes |
+| 3 | 13.21 ms | yes |
+| 4 | 13.78 ms | yes |
+
+**23.24 ms -> 13.2-13.8 ms, a 41% reduction, and the 4K frame budget is now
+met.** 1440p went 5.84 -> 3.2-3.3 ms.
+
+Correctness was re-verified after both refactors and is unchanged to every
+printed digit: reconstruction RMSE 0.04878, ghosting trailing energy 0.09000
+against the 0.17667 non-reprojecting control.
+
+### What is still unoptimised
+
+- RCAS is in-place, so spatial and RCAS cannot overlap. It costs 2.1x spatial
+  on its own and is now the second-largest term.
+- The lock state (8 bytes/px) is written every frame and is only two scalars.
+- Both are recorded rather than done, because the budget is met and the next
+  thing worth attacking is the FSR4 port, not micro-optimisation.
 
 ## Honest weaknesses
 

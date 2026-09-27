@@ -45,24 +45,26 @@ struct RCASParams {
     var sharpness: Float = 0.6
 }
 
-struct AccumParams {
+struct AccumUniforms {
     var upscaleSize = SIMD2<UInt32>(0, 0)
     var frameIndex: Float = 0
     var deltaTime: Float = 1.0 / 60.0
     var exposure: Float = 1
     var prevExposure: Float = 1
     var accumulation: Float = 0.9
+    var reset: Int32 = 0
+}
+
+struct AccumPixel {
     var lumaInstability: Float = 0
     var reactiveMask: Float = 0
     var disocclusion: Float = 0
     var shadingChange: Float = 0
     var lock: Float = 0
     var lockContribution: Float = 0
-    var currentColor = SIMD4<Float>(0, 0, 0, 0)
-    var historyColor = SIMD4<Float>(0, 0, 0, 0)
     var motionVector = SIMD2<Float>(0, 0)
-    var reset: Int32 = 0
 }
+
 
 func dispatch2D(_ e: MTLComputeCommandEncoder, _ p: MTLComputePipelineState,
                _ sx: Int, _ sy: Int) {
@@ -131,18 +133,19 @@ func run() throws {
         let lowBuf = try makeBuf(low, device)
         let outBuf = try makeBuf([SIMD4<Float>](repeating: .zero, count: uw * uh), device)
         let lockBuf = try makeBuf([SIMD2<Float>](repeating: .zero, count: uw * uh), device)
-        let accumBuf = try makeBuf([AccumParams](repeating: AccumParams(), count: uw * uh), device)
+        let accumBuf = try makeBuf([AccumPixel](repeating: AccumPixel(), count: uw * uh), device)
         // Keep history in a stable state so the temporal kernel is not
         // measuring its own initialisation.
-        var ap = AccumParams()
-        ap.upscaleSize = SIMD2<UInt32>(UInt32(uw), UInt32(uh))
-        ap.accumulation = 0.9
-        ap.reset = 1
+        // The accumulate pass reads current and history from the colour buffer
+        // the previous pass produced, so the pixel struct carries only the
+        // per-pixel state that is not already resident on the GPU.
         for i in 0..<(uw * uh) {
-            ap.currentColor = SIMD4(Float((i * 13) % 255) / 255.0, 0.4, 0.2, 1)
-            ap.historyColor = ap.currentColor
-            accumBuf.contents().bindMemory(to: AccumParams.self, capacity: uw * uh)[i] = ap
+            accumBuf.contents().bindMemory(to: AccumPixel.self, capacity: uw * uh)[i] = AccumPixel()
         }
+        var au = AccumUniforms()
+        au.upscaleSize = SIMD2<UInt32>(UInt32(uw), UInt32(uh))
+        au.accumulation = 0.9
+        au.reset = 1
 
         var sp = SpatialParams()
         sp.renderSize = SIMD2<UInt32>(UInt32(rw), UInt32(rh))
@@ -183,6 +186,9 @@ func run() throws {
                 e3.setBuffer(accumBuf, offset: 0, index: 0)
                 e3.setBuffer(outBuf, offset: 0, index: 1)
                 e3.setBuffer(lockBuf, offset: 0, index: 2)
+                e3.setBuffer(outBuf, offset: 0, index: 3)
+                e3.setBuffer(outBuf, offset: 0, index: 4)
+                e3.setBytes(&au, length: MemoryLayout<AccumUniforms>.stride, index: 5)
                 dispatch2D(e3, pAccum, uw, uh); e3.endEncoding()
             }),
         ]

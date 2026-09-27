@@ -115,24 +115,26 @@ struct RCASParams {
     var sharpness: Float = 0.6
 }
 
-struct AccumParams {
+struct AccumUniforms {
     var upscaleSize = SIMD2<UInt32>(0, 0)
     var frameIndex: Float = 0
     var deltaTime: Float = 1.0 / 60.0
     var exposure: Float = 1
     var prevExposure: Float = 1
     var accumulation: Float = 0.9
+    var reset: Int32 = 0
+}
+
+struct AccumPixel {
     var lumaInstability: Float = 0
     var reactiveMask: Float = 0
     var disocclusion: Float = 0
     var shadingChange: Float = 0
     var lock: Float = 0
     var lockContribution: Float = 0
-    var currentColor = SIMD4<Float>(0, 0, 0, 0)
-    var historyColor = SIMD4<Float>(0, 0, 0, 0)
     var motionVector = SIMD2<Float>(0, 0)
-    var reset: Int32 = 0
 }
+
 
 func run() throws {
     guard CommandLine.arguments.count == 2 else { throw LabError("usage: upscale-lab RECEIPT.json") }
@@ -259,16 +261,18 @@ func run() throws {
             let q = lockBuf.contents().bindMemory(to: SIMD2<Float>.self, capacity: uw * uh)
             return Array(UnsafeBufferPointer(start: q, count: uw * uh))
         }()
-        var params = (0..<(uw * uh)).map { i -> AccumParams in
-            var a = AccumParams()
-            a.upscaleSize = SIMD2<UInt32>(UInt32(uw), UInt32(uh))
-            a.frameIndex = Float(f)
-            a.accumulation = 0.9
-            a.currentColor = history[i]
-            a.historyColor = history[i]
+        // On a static scene current == history, so the same buffer serves both
+        // roles and the test stays a pure measure of the temporal filter.
+        let curBuf = try makeBuffer(history, device)
+        var u = AccumUniforms()
+        u.upscaleSize = SIMD2<UInt32>(UInt32(uw), UInt32(uh))
+        u.frameIndex = Float(f)
+        u.accumulation = 0.9
+        u.reset = (f == 0) ? 1 : 0
+        var params = (0..<(uw * uh)).map { i -> AccumPixel in
+            var a = AccumPixel()
             a.lock = prevStaticLock[i].x
             a.lockContribution = prevStaticLock[i].y
-            a.reset = (f == 0) ? 1 : 0
             return a
         }
         let pb = try makeBuffer(params, device)
@@ -277,6 +281,9 @@ func run() throws {
         e.setBuffer(pb, offset: 0, index: 0)
         e.setBuffer(outBuf, offset: 0, index: 1)
         e.setBuffer(lockBuf, offset: 0, index: 2)
+        e.setBuffer(curBuf, offset: 0, index: 3)
+        e.setBuffer(curBuf, offset: 0, index: 4)
+        e.setBytes(&u, length: MemoryLayout<AccumUniforms>.stride, index: 5)
         dispatch(e, pAccum, uw, uh); e.endEncoding()
         try commit(cb, "temporal frame \(f)")
         let cur = readOut()
@@ -315,20 +322,28 @@ func run() throws {
             let q = lockBuf.contents().bindMemory(to: SIMD2<Float>.self, capacity: uw * uh)
             return Array(UnsafeBufferPointer(start: q, count: uw * uh))
         }()
-        var params = (0..<(uw * uh)).map { i -> AccumParams in
-            var a = AccumParams()
+        var u = AccumUniforms()
+        u.upscaleSize = SIMD2<UInt32>(UInt32(uw), UInt32(uh))
+        u.frameIndex = Float(f)
+        u.accumulation = 0.9
+        u.reset = (f == 0) ? 1 : 0
+        // Reproject history into its own buffer: this is a separate pass from
+        // the accumulate, and doing it here keeps the kernel reading each pixel
+        // exactly once.
+        var reproj = [SIMD4<Float>](repeating: .zero, count: uw * uh)
+        for i in 0..<(uw * uh) {
             let x = i % uw
-            a.upscaleSize = SIMD2<UInt32>(UInt32(uw), UInt32(uh))
-            a.frameIndex = Float(f)
-            a.accumulation = 0.9
-            a.currentColor = moving[i]
-            // reproject: history at the source position, clamped at the edge
             let hx = Swift.min(Swift.max(x - 2, 0), uw - 1)
-            a.historyColor = gh[i - (x - hx)]
+            reproj[i] = gh[i - (x - hx)]
+        }
+        let reprojBuf = try makeBuffer(reproj, device)
+        let movingBuf = try makeBuffer(moving, device)
+        var params = (0..<(uw * uh)).map { i -> AccumPixel in
+            var a = AccumPixel()
+            let x = i % uw
             a.lock = prevLock[i].x
             a.lockContribution = prevLock[i].y
             a.motionVector = SIMD2<Float>(2, 0)
-            a.reset = (f == 0) ? 1 : 0
             // Disocclusion is a REACTIVE signal, not geometry: mark the band
             // the dot has vacated, where the previous colour is now wrong.
             let behind = Float(x) - Float(ox)
@@ -341,6 +356,9 @@ func run() throws {
         e.setBuffer(pb, offset: 0, index: 0)
         e.setBuffer(outBuf, offset: 0, index: 1)
         e.setBuffer(lockBuf, offset: 0, index: 2)
+        e.setBuffer(movingBuf, offset: 0, index: 3)
+        e.setBuffer(reprojBuf, offset: 0, index: 4)
+        e.setBytes(&u, length: MemoryLayout<AccumUniforms>.stride, index: 5)
         dispatch(e, pAccum, uw, uh); e.endEncoding()
         try commit(cb, "ghost frame \(f)")
         let cur = readOut()

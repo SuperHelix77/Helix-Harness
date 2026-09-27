@@ -45,15 +45,15 @@
     },
     {
       "max_err" : 0.75443518161773682,
-      "rmse" : 0.048775808751897062,
+      "rmse" : 0.048775798374472726,
       "shimmer_static" : 0,
       "variant" : "spatial_lanczos_rcas"
     },
     {
       "frames" : 16,
       "max_err" : 0.75443518161773682,
-      "rmse" : 0.048775809011365953,
-      "shimmer_static" : 1.4535137409068373e-09,
+      "rmse" : 0.04877579863357371,
+      "shimmer_static" : 1.4535212863443627e-09,
       "variant" : "temporal_lock"
     }
   ],
@@ -64,12 +64,12 @@
   "shimmer_expected" : "approximately zero once the temporal stage settles, because history is clipped to the current sample",
   "source_sha256" : {
     "fsr3metal\/kernels\/fsr3_spatial.metal" : "48eece7fd180bf23da771423bcf91ff7fdb6e5df073d1e66271c91d2bc60e723",
-    "fsr3metal\/kernels\/fsr3_temporal.metal" : "da6041edc35141dd8dcb406809b9b584b9d3810f89ad9ed3de44f590b250341f",
-    "fsr3metal\/native\/UpscaleLab.swift" : "c1eed11d95e63810f7b316626f27b93e5c80af103e50ebaad9e50729848e1e09"
+    "fsr3metal\/kernels\/fsr3_temporal.metal" : "c6b7ca586fea825b388ca136dfe654331d7b6c21fdef3f551da3f50194efdd39",
+    "fsr3metal\/native\/UpscaleLab.swift" : "b8730779e1d64475e7926732a9dabeea14d6346e149504baefd595fcf5d49305"
   },
   "upscale_size" : [
     1280,
     720
   ],
-  "utc_timestamp" : "2026-09-27T16:27:08Z"
+  "utc_timestamp" : "2026-09-27T16:42:02Z"
 }

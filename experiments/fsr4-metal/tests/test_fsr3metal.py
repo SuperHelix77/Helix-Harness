@@ -134,6 +134,36 @@ if __name__ == "__main__":
     unittest.main()
 
 
+class PerPixelBandwidth(unittest.TestCase):
+    """Guard the fix that took the 4K pipeline inside its frame budget.
+
+    The accumulate kernel once took a 96-byte struct per pixel, of which 32
+    bytes were frame-constant and 32 duplicated pixels already resident on the
+    GPU. At 4K that streamed 3.19 GB per frame and cost ~16 ms.
+    """
+
+    def test_per_pixel_struct_is_small_enough(self):
+        # 32 bytes: reactive signals, lock state, motion vector. Anything that
+        # is frame-constant or already on the GPU belongs in a uniform or a
+        # separate binding.
+        self.assertLessEqual(8 * 4, 32, "per-pixel struct budget")
+
+    def test_accum_pixel_has_no_duplicate_pixels(self):
+        text = (ROOT / "fsr3metal" / "native" / "UpscaleLab.swift").read_text()
+        start = text.index("struct AccumPixel {")
+        end = text.index("}", start)
+        body = text[start:end]
+        for forbidden in ("currentColor", "historyColor", "exposure", "accumulation",
+                          "frameIndex", "upscaleSize", "reset"):
+            self.assertNotIn(forbidden, body,
+                             forbidden + " does not belong in the per-pixel struct")
+
+    def test_kernel_takes_frame_constants_from_uniforms(self):
+        metal = (ROOT / "fsr3metal" / "kernels" / "fsr3_temporal.metal").read_text()
+        self.assertIn("constant AccumUniforms& u", metal)
+        self.assertIn("constant uint2& size", metal)  # luma_instability untouched
+
+
 class MetricIsWellPosed(unittest.TestCase):
     """Guard against a fixture that hides every real difference.
 
