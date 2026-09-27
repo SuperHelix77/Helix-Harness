@@ -57,6 +57,26 @@ upstream revision. No third-party source, binaries, models or Apple frameworks
 are vendored. The source-fetch attempt in the bootstrap was blocked; only
 public source-tree metadata was retrieved, not the shader bodies or weights.
 
+## Q38-inspired quality-first experiments
+
+See [Q38 transfer research](docs/Q38_TRANSFER.md) for the current plan and the
+distinction between stored bytes, GPU working set, computation and picture
+quality. New runnable experiments:
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 scripts/run_codec_lab.py evidence/new-codec-run.json
+sh scripts/run_fusion_lab.sh evidence/new-fusion-run.json
+```
+
+`weight_codec.py` provides lossless signed INT8 archive compression with exact
+exceptions and raw fallback. It expands before inference and does not claim
+smaller resident weights. The fusion lab compares convolution plus a separate
+quantization pass with a fused Metal dispatch. Its dyadic numerical contract is
+not yet validated as an AMD model operator. The new sequence-metric tests detect
+rare-pixel, edge and temporal regressions on frozen normalized-SDR fixtures;
+they do not constitute real-game quality or HDR validation.
+
 ## Integration boundary
 
 The future pipeline is game temporal inputs -> upscaler hook -> verified GPU
