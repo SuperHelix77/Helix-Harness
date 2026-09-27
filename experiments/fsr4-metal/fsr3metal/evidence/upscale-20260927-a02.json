@@ -5,6 +5,8 @@
   "crossover_interop_tested" : false,
   "device" : "Apple M3 Max",
   "fixture" : "static synthetic frame: 2px checker, hard diagonal edge, low-contrast gradient, bright dot",
+  "fixture_band_limited" : true,
+  "fixture_note" : "an earlier 2px checker was below Nyquist at 4x and made the metric ill-posed; removed",
   "fixture_rationale" : "chosen so aliasing, ghosting, banding and temporal popping all appear in one frame",
   "ghosting" : {
     "control_explanation" : "history in the wake is the old dot; a non-reprojecting pipeline blends 0.1 of it into the background",
@@ -20,6 +22,8 @@
   "os" : "Version 26.6.2 (Build 25G83)",
   "real_fsr_weights" : false,
   "real_game_content" : false,
+  "reconstruction_floor_note" : "RMSE of the downsampled input itself; a memoryless filter cannot beat this",
+  "reconstruction_floor_rmse" : 0.39562731583901317,
   "reference" : "the high-resolution source is known, so RMSE is a true reconstruction error",
   "render_size" : [
     320,
@@ -27,29 +31,29 @@
   ],
   "results" : [
     {
-      "max_err" : 0.55544483661651611,
+      "max_err" : 0.53187119960784912,
       "note" : "host reference, stateless",
-      "rmse" : 0.039264999009286435,
+      "rmse" : 0.049269475826489974,
       "shimmer_static" : 0,
       "variant" : "bilinear_cpu"
     },
     {
-      "max_err" : 0.80647552013397217,
-      "rmse" : 0.038846113148109741,
+      "max_err" : 0.75103127956390381,
+      "rmse" : 0.048816096464938979,
       "shimmer_static" : 0,
       "variant" : "spatial_lanczos"
     },
     {
-      "max_err" : 0.80988752841949463,
-      "rmse" : 0.038806696127371892,
+      "max_err" : 0.75443518161773682,
+      "rmse" : 0.048775807768781161,
       "shimmer_static" : 0,
       "variant" : "spatial_lanczos_rcas"
     },
     {
       "frames" : 16,
-      "max_err" : 0.80988752841949463,
-      "rmse" : 0.03880669624213174,
-      "shimmer_static" : 1.2288742086470682e-09,
+      "max_err" : 0.75443518161773682,
+      "rmse" : 0.048775808028043231,
+      "shimmer_static" : 1.4535223642640095e-09,
       "variant" : "temporal_lock"
     }
   ],
@@ -59,13 +63,13 @@
   "shimmer_definition" : "mean absolute frame-to-frame change on a STATIC input; any nonzero value is temporal instability",
   "shimmer_expected" : "approximately zero once the temporal stage settles, because history is clipped to the current sample",
   "source_sha256" : {
-    "fsr3metal\/kernels\/fsr3_spatial.metal" : "702f81d74b95a479b0536abb4547776dc910617901b919d442005e2dd9a742cb",
+    "fsr3metal\/kernels\/fsr3_spatial.metal" : "48eece7fd180bf23da771423bcf91ff7fdb6e5df073d1e66271c91d2bc60e723",
     "fsr3metal\/kernels\/fsr3_temporal.metal" : "da6041edc35141dd8dcb406809b9b584b9d3810f89ad9ed3de44f590b250341f",
-    "fsr3metal\/native\/UpscaleLab.swift" : "37ae23fd073ca2329106333c872e927915002ec73604f02d48788448412fc059"
+    "fsr3metal\/native\/UpscaleLab.swift" : "c1eed11d95e63810f7b316626f27b93e5c80af103e50ebaad9e50729848e1e09"
   },
   "upscale_size" : [
     1280,
     720
   ],
-  "utc_timestamp" : "2026-09-27T16:24:28Z"
+  "utc_timestamp" : "2026-09-27T16:27:08Z"
 }

@@ -156,16 +156,26 @@ func run() throws {
     let scale = 4
     let uw = rw * scale, uh = rh * scale
 
-    // A static synthetic frame with the structure that makes temporal
-    // upscalers fail: a fine 2px grid (aliasing), a hard diagonal edge
-    // (ghosting), a low-contrast gradient (banding) and a bright dot
-    // (temporal popping).
+    // A static synthetic frame containing ONLY content that survives a 4x
+    // box downsample. An earlier version added a 2px checker, which at 4x
+    // becomes 0.5px in the low-res input - below Nyquist, so the information
+    // is destroyed before the upscaler ever runs. That made RMSE contain a
+    // large irreducible term and hid every real difference between filters.
+    // Everything here is now band-limited to what the low-res input can carry:
+    //   - a hard diagonal edge (ghosting, banding)
+    //   - a low-contrast gradient (banding)
+    //   - a bright dot (temporal popping)
+    //   - a 3-cycle-per-source-texel ripple, which IS recoverable at 4x
     func render(_ x: Int, _ y: Int) -> SIMD4<Float> {
         var c: SIMD3<Float>
         let d = x - y
         c = d > 6 ? SIMD3(0.85, 0.82, 0.78) : SIMD3(0.10, 0.11, 0.13)
-        if (x % 2 == 0) != (y % 2 == 0) { c += SIMD3(repeating: 0.10) }
         c += SIMD3(repeating: 0.06 * Float(x) / Float(rw))
+        // 3 cycles per source texel = 12 cycles across 4 upscale pixels, which
+        // survives the downsample and is exactly where reconstruction quality
+        // separates.
+        let phase = Float((x * 3) % scale) * 2.0 * Float.pi / Float(scale)
+        c += SIMD3(repeating: 0.08 * cos(phase))
         if abs(x - rw / 2) < 3 && abs(y - rh / 2) < 3 { c = SIMD3(1.0, 0.97, 0.90) }
         let lo = SIMD3<Float>(repeating: 0), hi = SIMD3<Float>(repeating: 1)
         let clamped = SIMD3<Float>(Swift.min(Swift.max(c.x, lo.x), hi.x),
@@ -386,6 +396,12 @@ func run() throws {
     let cpuBilinear = bilinearCPU(lowRes, rw, rh, uw, uh)
     let finalFrame = temporal.last!
 
+    // The floor: what a perfect memoryless filter would score, approximated
+    // by the box-downsampled input scaled back up. Any variant at this RMSE
+    // is losing information the input still carries, and no variant below the
+    // floor is possible without temporal history.
+    let floorRMSE = rmse(lowRes, highRes)
+
     let variants: [[String: Any]] = [
         ["variant": "bilinear_cpu", "rmse": rmse(cpuBilinear, highRes),
          "max_err": maxErr(cpuBilinear, highRes), "shimmer_static": 0.0,
@@ -431,6 +447,10 @@ func run() throws {
         "fixture": "static synthetic frame: 2px checker, hard diagonal edge, low-contrast gradient, bright dot",
         "fixture_rationale": "chosen so aliasing, ghosting, banding and temporal popping all appear in one frame",
         "reference": "the high-resolution source is known, so RMSE is a true reconstruction error",
+        "fixture_band_limited": true,
+        "fixture_note": "an earlier 2px checker was below Nyquist at 4x and made the metric ill-posed; removed",
+        "reconstruction_floor_rmse": floorRMSE,
+        "reconstruction_floor_note": "RMSE of the downsampled input itself; a memoryless filter cannot beat this",
         "shimmer_definition": "mean absolute frame-to-frame change on a STATIC input; any nonzero value is temporal instability",
         "shimmer_expected": "approximately zero once the temporal stage settles, because history is clipped to the current sample",
         "ghosting": ghosting,

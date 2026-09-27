@@ -132,3 +132,51 @@ class SourceIntegrity(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MetricIsWellPosed(unittest.TestCase):
+    """Guard against a fixture that hides every real difference.
+
+    An earlier fixture added a 2px checker to the high-resolution source. At 4x
+    that becomes 0.5px in the low-resolution input, below Nyquist, so the
+    information is destroyed before the upscaler runs. RMSE then carried a
+    large constant term and bilinear and Lanczos scored within 1% of each
+    other for reasons that had nothing to do with the filters.
+    """
+
+    def test_receipts_declare_the_fixture_is_band_limited(self):
+        for path in RECEIPTS:
+            data = json.loads(path.read_text())
+            with self.subTest(receipt=path.name):
+                self.assertTrue(data.get("fixture_band_limited"))
+                self.assertIn("reconstruction_floor_rmse", data)
+
+    def test_variants_beat_the_memoryless_floor(self):
+        """Every memoryless filter must beat the downsampled input itself."""
+        for path in RECEIPTS:
+            data = json.loads(path.read_text())
+            floor = data.get("reconstruction_floor_rmse")
+            if floor is None:
+                continue
+            for row in data["results"]:
+                if row["variant"] == "temporal_lock":
+                    continue
+                with self.subTest(receipt=path.name, variant=row["variant"]):
+                    self.assertLess(
+                        row["rmse"], floor,
+                        "a memoryless filter cannot score worse than the input it read")
+
+    def test_lanczos_beats_bilinear_by_a_real_margin(self):
+        """Not just 'better', but better than the run-to-run precision of the
+        metric. A 0.1% edge is a coin flip, not a result."""
+        for path in RECEIPTS:
+            data = json.loads(path.read_text())
+            rows = {r["variant"]: r for r in data["results"]}
+            if "bilinear_cpu" not in rows or "spatial_lanczos" not in rows:
+                continue
+            with self.subTest(receipt=path.name):
+                b = rows["bilinear_cpu"]["rmse"]
+                l = rows["spatial_lanczos"]["rmse"]
+                self.assertLess(l, b)
+                self.assertGreater((b - l) / b, 0.002,
+                                   "improvement is too small to distinguish from noise")

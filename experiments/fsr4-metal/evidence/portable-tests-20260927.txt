@@ -21,6 +21,11 @@ test_successful_sequence (test_contract.ContractTests.test_successful_sequence) 
 test_symmetric_and_clamped (test_fsr3metal.LanczosPolynomial.test_symmetric_and_clamped) ... ok
 test_tracks_true_lanczos2 (test_fsr3metal.LanczosPolynomial.test_tracks_true_lanczos2) ... ok
 test_unity_at_origin_and_support_edges (test_fsr3metal.LanczosPolynomial.test_unity_at_origin_and_support_edges) ... ok
+test_lanczos_beats_bilinear_by_a_real_margin (test_fsr3metal.MetricIsWellPosed.test_lanczos_beats_bilinear_by_a_real_margin)
+Not just 'better', but better than the run-to-run precision of the ... ok
+test_receipts_declare_the_fixture_is_band_limited (test_fsr3metal.MetricIsWellPosed.test_receipts_declare_the_fixture_is_band_limited) ... ok
+test_variants_beat_the_memoryless_floor (test_fsr3metal.MetricIsWellPosed.test_variants_beat_the_memoryless_floor)
+Every memoryless filter must beat the downsampled input itself. ... ok
 test_ghosting_metric_has_discriminating_power (test_fsr3metal.ReceiptHonesty.test_ghosting_metric_has_discriminating_power)
 A ghosting metric that cannot fail is not a test. ... ok
 test_lanczos_beats_bilinear (test_fsr3metal.ReceiptHonesty.test_lanczos_beats_bilinear) ... ok
@@ -73,6 +78,6 @@ test_random_roundtrip (test_weight_codec.WeightCodecTests.test_random_roundtrip)
 test_truncation_and_extra_data (test_weight_codec.WeightCodecTests.test_truncation_and_extra_data) ... ok
 
 ----------------------------------------------------------------------
-Ran 68 tests in 0.043s
+Ran 71 tests in 0.044s
 
 OK
