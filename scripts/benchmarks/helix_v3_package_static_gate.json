@@ -1,0 +1,28 @@
+{
+  "schema_version": "helix-v3-package-static-qualification-config.v1",
+  "gate_id": "HELIX-V3-PACKAGE-STATIC-QUALIFICATION-V1",
+  "app": {
+    "bundle_name": "Helix Harness v3.app",
+    "bundle_identifier": "ai.helix.harness.v3",
+    "display_name": "Helix Harness v3",
+    "version": "3.0.0",
+    "executable_relative_path": "Contents/MacOS/unsloth-studio",
+    "executable_sha256": "d0ec06a89074538764131eda112a874a54fce1dd2da4bb877cd464d68f771a89",
+    "info_plist_sha256": "6b58fd8447efe8fbec34a6c886dda1806f21e90f3e0b1ad5f808f43254184aed",
+    "file_count": 677,
+    "total_bytes": 60833246,
+    "tree_sha256": "3c7555e2324b640dce27d1d3862c70d6127ae33bcfbf6a5f3f03ef62d8722149"
+  },
+  "backend": {
+    "manifest_relative_path": "Contents/Resources/helix-backend/HELIX_BACKEND_MANIFEST.json",
+    "manifest_sha256": "396ea463e8ebe2cf6c773fa6b4a390b8d5fec704954a54bea35e31996ddb5017",
+    "schema_version": "helix.backend-overlay.v1",
+    "contract": "helix.adaptive.backend.v1",
+    "file_count": 670,
+    "tree_sha256": "b445577428d549fd26f40fd76ba52a1832dbfbd42d2225a63a2b7d437a1e7f06"
+  },
+  "trust_policy": {
+    "qualification_target": "static_identity",
+    "required_team_identifier": null
+  }
+}

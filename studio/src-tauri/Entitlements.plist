@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Allow spawning child processes (Python backend, install scripts) -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <!-- Network access for backend health checks and HuggingFace API -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+    <!-- Permit microphone capture for local dictation -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+    <!-- Allow loading Python/venv libraries not signed by us -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <!-- Automation: Terminal.app / System Events for the coding workspace -->
+    <key>com.apple.security.automation.apple-events</key>
+    <true/>
+    <!-- User-picked project folders for terminal and edit_file -->
+    <key>com.apple.security.files.user-selected.read-write</key>
+    <true/>
+    <!-- Local backend listens on loopback -->
+    <key>com.apple.security.network.server</key>
+    <true/>
+</dict>
+</plist>

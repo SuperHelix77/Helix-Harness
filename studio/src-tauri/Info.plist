@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Helix Harness uses the microphone you select for local voice dictation.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Helix Harness uses Automation to open Terminal and run coding-workspace commands you approve.</string>
+    <key>NSDesktopFolderUsageDescription</key>
+    <string>Helix Harness needs Desktop access so the terminal and coding tools can work in project folders you keep there.</string>
+    <key>NSDocumentsFolderUsageDescription</key>
+    <string>Helix Harness needs Documents access so the terminal and coding tools can work in project folders you keep there.</string>
+    <key>NSDownloadsFolderUsageDescription</key>
+    <string>Helix Harness needs Downloads access so the terminal and coding tools can read and write files you place there.</string>
+    <key>NSRemovableVolumesUsageDescription</key>
+    <string>Helix Harness needs removable-volume access when a coding workspace lives on an external disk.</string>
+    <key>NSNetworkVolumesUsageDescription</key>
+    <string>Helix Harness needs network-volume access when a coding workspace lives on a mounted share.</string>
+</dict>
+</plist>

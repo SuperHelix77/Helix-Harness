@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1180" width="1600" height="1180" role="img" aria-labelledby="title description">
+  <title id="title">Helix Harness architecture</title>
+  <desc id="description">Models supply bounded intelligence as reasoning resources. Helix owns the Interlingua and durable typed state, supercharged Mem0, evidence-gated skills, the Execution Graph and provenance, a context broker, the capability broker and durable agent runtime, and evidence and artifacts. ObservationPacks return evidence into state.</desc>
+
+  <rect width="1600" height="1180" fill="#0E1418"/>
+
+  <defs>
+    <linearGradient id="modelFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1D2A33"/>
+      <stop offset="1" stop-color="#162027"/>
+    </linearGradient>
+    <linearGradient id="helixFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#22333D"/>
+      <stop offset="1" stop-color="#1A262E"/>
+    </linearGradient>
+    <linearGradient id="authorityFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#24384233"/>
+      <stop offset="1" stop-color="#1B2830"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 10 5 0 10z" fill="#8FA9B4"/>
+    </marker>
+  </defs>
+
+  <!-- ── header ─────────────────────────────────────────────── -->
+  <text x="800" y="60" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="34" font-weight="650" letter-spacing="4" fill="#F4F7F8">HELIX HARNESS ARCHITECTURE</text>
+  <text x="800" y="92" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="17" font-weight="450" letter-spacing="3" fill="#8096A0">MODELS SUPPLY INTELLIGENCE · HELIX OWNS EXECUTION, CONTEXT, MEMORY, EVIDENCE, LEARNING</text>
+
+  <!-- ── models (reasoning resources) ──────────────────────── -->
+  <rect x="330" y="130" width="940" height="96" rx="20" fill="url(#modelFill)" stroke="#4E6874" stroke-width="2"/>
+  <text x="800" y="172" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="23" font-weight="600" fill="#F4F7F8">REASONING MODELS</text>
+  <text x="800" y="203" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="16" fill="#9FB4BE">small scout · local worker · local senior · frontier escalation  —  all inside ONE Helix task</text>
+  <text x="800" y="222" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="13" font-style="italic" fill="#6E8792">the tier is a routing decision, never an architectural fork</text>
+
+  <line x1="800" y1="226" x2="800" y2="266" stroke="#8FA9B4" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="812" y="252" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="13" fill="#7C939E">semantic intent</text>
+
+  <!-- ── Helix Interlingua ──────────────────────────────────── -->
+  <rect x="330" y="270" width="940" height="92" rx="20" fill="url(#helixFill)" stroke="#6E8B98" stroke-width="2.5"/>
+  <text x="800" y="308" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="23" font-weight="620" fill="#F4F7F8">HELIX INTERLINGUA</text>
+  <text x="800" y="337" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="16" fill="#9FB4BE">durable typed, model-neutral state · Intent · Action · Observation · Claim · Reference</text>
+  <text x="800" y="356" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="13" font-style="italic" fill="#6E8792">canonical semantics are separate from model rendering</text>
+
+  <line x1="800" y1="362" x2="800" y2="398" stroke="#8FA9B4" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- ── three planes ───────────────────────────────────────── -->
+  <line x1="800" y1="398" x2="270" y2="398" stroke="#8FA9B4" stroke-width="2"/>
+  <line x1="270" y1="398" x2="1330" y2="398" stroke="#8FA9B4" stroke-width="2"/>
+  <line x1="270" y1="398" x2="270" y2="418" stroke="#8FA9B4" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="800" y1="398" x2="800" y2="418" stroke="#8FA9B4" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="1330" y1="398" x2="1330" y2="418" stroke="#8FA9B4" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="60" y="422" width="420" height="150" rx="18" fill="url(#helixFill)" stroke="#5C7885" stroke-width="2"/>
+  <text x="270" y="456" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="19" font-weight="600" fill="#F4F7F8">SUPERCHARGED MEM0</text>
+  <text x="270" y="484" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="14" fill="#9FB4BE">typed evidence · account-stable identity</text>
+  <text x="270" y="506" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="14" fill="#9FB4BE">hybrid retrieval · supersession</text>
+  <text x="270" y="528" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="13" font-style="italic" fill="#6E8792">old → SUPERSEDED_BY → current</text>
+  <text x="270" y="552" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="12.5" fill="#7C939E">retrieval never promotes epistemic class</text>
+
+  <rect x="590" y="422" width="420" height="150" rx="18" fill="url(#helixFill)" stroke="#5C7885" stroke-width="2"/>
+  <text x="800" y="456" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="19" font-weight="600" fill="#F4F7F8">SKILLS / PROCEDURES</text>
+  <text x="800" y="484" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="14" fill="#9FB4BE">Hermes learning engine</text>
+  <text x="800" y="506" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="14" fill="#9FB4BE">temporary → evidence-gated → retained</text>
+  <text x="800" y="528" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="13" font-style="italic" fill="#6E8792">promotion requires post-task evidence</text>
+  <text x="800" y="552" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="12.5" fill="#7C939E">self-QLoRA: candidate → eval → promote/reject</text>
+
+  <rect x="1120" y="422" width="420" height="150" rx="18" fill="url(#helixFill)" stroke="#5C7885" stroke-width="2"/>
+  <text x="1330" y="456" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="19" font-weight="600" fill="#F4F7F8">EXECUTION GRAPH</text>
+  <text x="1330" y="484" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="14" fill="#9FB4BE">provenance · causal graph</text>
+  <text x="1330" y="506" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="14" fill="#9FB4BE">immutable references</text>
+  <text x="1330" y="528" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="13" font-style="italic" fill="#6E8792">never fabricates causality</text>
+  <text x="1330" y="552" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="12.5" fill="#7C939E">OBSERVED · VERIFIED · MODEL_CLAIM · STALE · UNKNOWN</text>
+
+  <!-- ── context broker ────────────────────────────────────── -->
+  <line x1="270" y1="572" x2="270" y2="606" stroke="#8FA9B4" stroke-width="2"/>
+  <line x1="800" y1="572" x2="800" y2="606" stroke="#8FA9B4" stroke-width="2"/>
+  <line x1="1330" y1="572" x2="1330" y2="606" stroke="#8FA9B4" stroke-width="2"/>
+  <line x1="270" y1="606" x2="1330" y2="606" stroke="#8FA9B4" stroke-width="2"/>
+  <line x1="800" y1="606" x2="800" y2="626" stroke="#8FA9B4" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="330" y="630" width="940" height="88" rx="20" fill="#182228" stroke="#57737F" stroke-width="2"/>
+  <text x="800" y="666" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="21" font-weight="600" fill="#F4F7F8">CONTEXT BROKER</text>
+  <text x="800" y="694" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="15" fill="#9FB4BE">adaptive 80% boundary · hard-overflow safety · exposure-aware governor</text>
+  <text x="800" y="712" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="12.5" font-style="italic" fill="#6E8792">optional tiny information plane proposes — it holds zero authority</text>
+
+  <line x1="800" y1="718" x2="800" y2="752" stroke="#8FA9B4" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="812" y="741" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="13" fill="#7C939E">typed proposals</text>
+
+  <!-- ── authority ──────────────────────────────────────────── -->
+  <rect x="330" y="756" width="940" height="120" rx="20" fill="url(#authorityFill)" stroke="#8FB0BE" stroke-width="3"/>
+  <text x="800" y="794" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="22" font-weight="650" fill="#F4F7F8">CAPABILITY BROKER + DURABLE AGENT RUNTIME</text>
+  <text x="800" y="822" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="15" fill="#B4C7D0">typed authority: filesystem · process · network · git · credentials · persistence · external</text>
+  <text x="800" y="846" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="14" fill="#9FB4BE">durable lifecycle: proposed → approval → claimed → started → output → finished</text>
+  <text x="800" y="866" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="12.5" font-style="italic" fill="#7C939E">finished receipts are replay-only · ambiguous outcomes fail closed · grants bind account + tool + payload hash</text>
+
+  <line x1="800" y1="876" x2="800" y2="910" stroke="#8FA9B4" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="812" y="899" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="13" fill="#7C939E">execution</text>
+
+  <!-- ── evidence ───────────────────────────────────────────── -->
+  <rect x="330" y="914" width="940" height="92" rx="20" fill="url(#helixFill)" stroke="#5C7885" stroke-width="2"/>
+  <text x="800" y="950" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="21" font-weight="600" fill="#F4F7F8">EVIDENCE / ARTIFACTS</text>
+  <text x="800" y="978" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="15" fill="#9FB4BE">immutable, content-addressed references · raw output preserved</text>
+  <text x="800" y="998" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="12.5" font-style="italic" fill="#6E8792">the model can expand exact evidence on demand</text>
+
+  <!-- ── ObservationPack feedback ───────────────────────────── -->
+  <line x1="800" y1="1006" x2="800" y2="1046" stroke="#8FA9B4" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="500" y="1050" width="600" height="60" rx="16" fill="#1B2A32" stroke="#6E8B98" stroke-width="2" stroke-dasharray="7 5"/>
+  <text x="800" y="1088" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="19" font-weight="600" fill="#DCE7EC">ObservationPack → back into state</text>
+
+  <path d="M1100 1080 C1330 1080 1400 900 1330 700 C1300 600 1100 560 800 560" fill="none" stroke="#4E6874" stroke-width="2" stroke-dasharray="6 6" marker-end="url(#arrow)" opacity=".75"/>
+  <text x="1372" y="880" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="12.5" font-style="italic" fill="#6E8792">compact</text>
+  <text x="1372" y="898" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="12.5" font-style="italic" fill="#6E8792">evidence,</text>
+  <text x="1372" y="916" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="12.5" font-style="italic" fill="#6E8792">not noise</text>
+
+  <!-- ── footer rule ────────────────────────────────────────── -->
+  <path d="M60 1140H1540" stroke="#91AFBB" stroke-opacity=".14"/>
+  <text x="800" y="1166" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif" font-size="13" font-weight="450" letter-spacing="2.5" fill="#5F7681">HELIX OWNS THE STATE · MODELS SUPPLY THE INTELLIGENCE</text>
+</svg>
