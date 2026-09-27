@@ -18,6 +18,19 @@ test_native_metadata (test_contract.ContractTests.test_native_metadata) ... ok
 test_nonfinite_and_zero (test_contract.ContractTests.test_nonfinite_and_zero) ... ok
 test_pending_and_stale_completion (test_contract.ContractTests.test_pending_and_stale_completion) ... ok
 test_successful_sequence (test_contract.ContractTests.test_successful_sequence) ... ok
+test_symmetric_and_clamped (test_fsr3metal.LanczosPolynomial.test_symmetric_and_clamped) ... ok
+test_tracks_true_lanczos2 (test_fsr3metal.LanczosPolynomial.test_tracks_true_lanczos2) ... ok
+test_unity_at_origin_and_support_edges (test_fsr3metal.LanczosPolynomial.test_unity_at_origin_and_support_edges) ... ok
+test_ghosting_metric_has_discriminating_power (test_fsr3metal.ReceiptHonesty.test_ghosting_metric_has_discriminating_power)
+A ghosting metric that cannot fail is not a test. ... ok
+test_lanczos_beats_bilinear (test_fsr3metal.ReceiptHonesty.test_lanczos_beats_bilinear) ... ok
+test_no_competitive_claims (test_fsr3metal.ReceiptHonesty.test_no_competitive_claims) ... ok
+test_pipeline_is_at_background_level (test_fsr3metal.ReceiptHonesty.test_pipeline_is_at_background_level)
+A reprojecting pipeline must leave no visible trail. ... ok
+test_receipts_exist (test_fsr3metal.ReceiptHonesty.test_receipts_exist) ... ok
+test_kernels_reference_provenance (test_fsr3metal.SourceIntegrity.test_kernels_reference_provenance) ... ok
+test_no_amd_binaries_vendored (test_fsr3metal.SourceIntegrity.test_no_amd_binaries_vendored)
+The FSR4 DLL must never enter the repository. ... ok
 test_every_half_bit_round_trips_through_float (test_precision_arena.HalfRoundTrip.test_every_half_bit_round_trips_through_float) ... ok
 test_exact_small_values (test_precision_arena.HalfRoundTrip.test_exact_small_values) ... ok
 test_negative_zero_preserved (test_precision_arena.HalfRoundTrip.test_negative_zero_preserved) ... ok
@@ -60,6 +73,6 @@ test_random_roundtrip (test_weight_codec.WeightCodecTests.test_random_roundtrip)
 test_truncation_and_extra_data (test_weight_codec.WeightCodecTests.test_truncation_and_extra_data) ... ok
 
 ----------------------------------------------------------------------
-Ran 58 tests in 0.038s
+Ran 68 tests in 0.043s
 
 OK

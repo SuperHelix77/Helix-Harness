@@ -1,0 +1,71 @@
+{
+  "better_than_base_fsr_claimed" : false,
+  "better_than_dlss_claimed" : false,
+  "better_than_metalfx_claimed" : false,
+  "crossover_interop_tested" : false,
+  "device" : "Apple M3 Max",
+  "fixture" : "static synthetic frame: 2px checker, hard diagonal edge, low-contrast gradient, bright dot",
+  "fixture_rationale" : "chosen so aliasing, ghosting, banding and temporal popping all appear in one frame",
+  "ghosting" : {
+    "control_explanation" : "history in the wake is the old dot; a non-reprojecting pipeline blends 0.1 of it into the background",
+    "frames" : 8,
+    "ghosting_excess_over_ground_truth" : 3.5762786898541066e-09,
+    "ground_truth_background" : 0.089999999999999997,
+    "interpretation" : "a naive history blend smears the dot; excess luminance in the wake is ghosting",
+    "metric_has_discriminating_power" : true,
+    "naive_blend_control_trailing_energy" : 0.17666666666666667,
+    "scenario" : "bright dot translating 2 upscale px\/frame over a static background",
+    "trailing_energy" : 0.090000003576278687
+  },
+  "os" : "Version 26.6.2 (Build 25G83)",
+  "real_fsr_weights" : false,
+  "real_game_content" : false,
+  "reference" : "the high-resolution source is known, so RMSE is a true reconstruction error",
+  "render_size" : [
+    320,
+    180
+  ],
+  "results" : [
+    {
+      "max_err" : 0.55544483661651611,
+      "note" : "host reference, stateless",
+      "rmse" : 0.039264999009286435,
+      "shimmer_static" : 0,
+      "variant" : "bilinear_cpu"
+    },
+    {
+      "max_err" : 0.80647552013397217,
+      "rmse" : 0.038846113148109741,
+      "shimmer_static" : 0,
+      "variant" : "spatial_lanczos"
+    },
+    {
+      "max_err" : 0.80988752841949463,
+      "rmse" : 0.038806694223510831,
+      "shimmer_static" : 0,
+      "variant" : "spatial_lanczos_rcas"
+    },
+    {
+      "frames" : 16,
+      "max_err" : 0.80988752841949463,
+      "rmse" : 0.038806694337862706,
+      "shimmer_static" : 1.2288609143047604e-09,
+      "variant" : "temporal_lock"
+    }
+  ],
+  "scale" : 4,
+  "schema" : "helix.fsr-metal.fsr3-upscale-lab.v1",
+  "scope" : "synthetic_sequence_stability_and_reconstruction",
+  "shimmer_definition" : "mean absolute frame-to-frame change on a STATIC input; any nonzero value is temporal instability",
+  "shimmer_expected" : "approximately zero once the temporal stage settles, because history is clipped to the current sample",
+  "source_sha256" : {
+    "fsr3metal\/kernels\/fsr3_spatial.metal" : "702f81d74b95a479b0536abb4547776dc910617901b919d442005e2dd9a742cb",
+    "fsr3metal\/kernels\/fsr3_temporal.metal" : "da6041edc35141dd8dcb406809b9b584b9d3810f89ad9ed3de44f590b250341f",
+    "fsr3metal\/native\/UpscaleLab.swift" : "37ae23fd073ca2329106333c872e927915002ec73604f02d48788448412fc059"
+  },
+  "upscale_size" : [
+    1280,
+    720
+  ],
+  "utc_timestamp" : "2026-09-27T16:24:28Z"
+}

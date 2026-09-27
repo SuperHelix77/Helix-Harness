@@ -1,0 +1,293 @@
+{
+  "candidate_manifests": {
+    "region_rdata_0x001c4ec4": [
+      {
+        "declared_bytes": 133380,
+        "record_index": 0
+      },
+      {
+        "declared_bytes": 12704,
+        "record_index": 2
+      },
+      {
+        "declared_bytes": 12563,
+        "record_index": 6
+      },
+      {
+        "declared_bytes": 12712,
+        "record_index": 10
+      },
+      {
+        "declared_bytes": 45466,
+        "record_index": 14
+      },
+      {
+        "declared_bytes": 44310,
+        "record_index": 18
+      },
+      {
+        "declared_bytes": 45805,
+        "record_index": 22
+      },
+      {
+        "declared_bytes": 45408,
+        "record_index": 26
+      },
+      {
+        "declared_bytes": 12318,
+        "record_index": 30
+      },
+      {
+        "declared_bytes": 35418,
+        "record_index": 34
+      },
+      {
+        "declared_bytes": 44108,
+        "record_index": 38
+      },
+      {
+        "declared_bytes": 12623,
+        "record_index": 42
+      },
+      {
+        "declared_bytes": 9362,
+        "record_index": 46
+      },
+      {
+        "declared_bytes": 45445,
+        "record_index": 50
+      },
+      {
+        "declared_bytes": 8651,
+        "record_index": 54
+      },
+      {
+        "declared_bytes": 11632,
+        "record_index": 58
+      },
+      {
+        "declared_bytes": 7841,
+        "record_index": 62
+      },
+      {
+        "declared_bytes": 42722,
+        "record_index": 66
+      },
+      {
+        "declared_bytes": 11530,
+        "record_index": 70
+      },
+      {
+        "declared_bytes": 44639,
+        "record_index": 74
+      },
+      {
+        "declared_bytes": 43874,
+        "record_index": 78
+      },
+      {
+        "declared_bytes": 10251,
+        "record_index": 82
+      },
+      {
+        "declared_bytes": 46152,
+        "record_index": 86
+      },
+      {
+        "declared_bytes": 9573,
+        "record_index": 90
+      },
+      {
+        "declared_bytes": 43261,
+        "record_index": 94
+      },
+      {
+        "declared_bytes": 12286,
+        "record_index": 98
+      },
+      {
+        "declared_bytes": 44568,
+        "record_index": 102
+      },
+      {
+        "declared_bytes": 10109,
+        "record_index": 106
+      },
+      {
+        "declared_bytes": 43059,
+        "record_index": 110
+      },
+      {
+        "declared_bytes": 45140,
+        "record_index": 114
+      },
+      {
+        "declared_bytes": 45164,
+        "record_index": 118
+      },
+      {
+        "declared_bytes": 44280,
+        "record_index": 122
+      },
+      {
+        "declared_bytes": 8929,
+        "record_index": 126
+      },
+      {
+        "declared_bytes": 8695,
+        "record_index": 130
+      },
+      {
+        "declared_bytes": 42687,
+        "record_index": 134
+      },
+      {
+        "declared_bytes": 44936,
+        "record_index": 138
+      },
+      {
+        "declared_bytes": 12800,
+        "record_index": 142
+      },
+      {
+        "declared_bytes": 42708,
+        "record_index": 146
+      },
+      {
+        "declared_bytes": 46214,
+        "record_index": 150
+      },
+      {
+        "declared_bytes": 11338,
+        "record_index": 154
+      },
+      {
+        "declared_bytes": 12172,
+        "record_index": 158
+      },
+      {
+        "declared_bytes": 45945,
+        "record_index": 162
+      },
+      {
+        "declared_bytes": 12816,
+        "record_index": 166
+      },
+      {
+        "declared_bytes": 46208,
+        "record_index": 170
+      }
+    ],
+    "region_rdata_0x02d644f4": [
+      {
+        "declared_bytes": 45705,
+        "record_index": 7
+      },
+      {
+        "declared_bytes": 42929,
+        "record_index": 9
+      },
+      {
+        "declared_bytes": 13701,
+        "record_index": 11
+      },
+      {
+        "declared_bytes": 12941,
+        "record_index": 13
+      },
+      {
+        "declared_bytes": 8955,
+        "record_index": 15
+      },
+      {
+        "declared_bytes": 12223,
+        "record_index": 17
+      },
+      {
+        "declared_bytes": 44774,
+        "record_index": 19
+      },
+      {
+        "declared_bytes": 44780,
+        "record_index": 21
+      },
+      {
+        "declared_bytes": 10610,
+        "record_index": 23
+      },
+      {
+        "declared_bytes": 13048,
+        "record_index": 25
+      },
+      {
+        "declared_bytes": 44509,
+        "record_index": 27
+      },
+      {
+        "declared_bytes": 46348,
+        "record_index": 29
+      },
+      {
+        "declared_bytes": 43136,
+        "record_index": 31
+      },
+      {
+        "declared_bytes": 5022,
+        "record_index": 33
+      },
+      {
+        "declared_bytes": 8896,
+        "record_index": 35
+      },
+      {
+        "declared_bytes": 10864,
+        "record_index": 37
+      },
+      {
+        "declared_bytes": 10733,
+        "record_index": 39
+      },
+      {
+        "declared_bytes": 11676,
+        "record_index": 41
+      },
+      {
+        "declared_bytes": 11061,
+        "record_index": 43
+      },
+      {
+        "declared_bytes": 11982,
+        "record_index": 45
+      },
+      {
+        "declared_bytes": 44616,
+        "record_index": 47
+      },
+      {
+        "declared_bytes": 44344,
+        "record_index": 49
+      }
+    ]
+  },
+  "evidence_class": "REAL_ARTIFACT_STATIC",
+  "schema": "helix.fsr-metal.fsr4-weight-manifest-partial.v1",
+  "source_binary": {
+    "bytes": 65657608,
+    "note": "User-supplied via pixeldrain. Not executed. Not redistributed here.",
+    "sha256": "4e7dc37aebea3a90e3d3cc43e24cb2b54176b2535315f20dbe63b3b7cfc56b1e"
+  },
+  "status": "PARTIAL",
+  "what_is_NOT_established": [
+    "No tensor has been matched to a pass index (pass0..pass12).",
+    "No tensor shape (height/width/channels) has been recovered.",
+    "It is NOT proven that the 24-byte table is the model manifest rather than another data table.",
+    "The 27 fsr4_model_v07_* strings are shader debug labels, NOT a weight table.",
+    "No weight bytes have been extracted, validated, or dequantised."
+  ],
+  "what_was_established": [
+    "The .rdata section is 63.4 MB. 5,176 DXIL/DXBC shader containers account for ~50 MB of it.",
+    "The remainder is ~23 MB across five uncovered runs, containing tensor-shaped data.",
+    "At least one of those runs begins with a regular 24-byte-stride record table whose first u32 is a plausible tensor byte count (133380, 12704, 12563, 12712, 45466, 44310, 45805, ...).",
+    "The size distribution is consistent with a convolutional network: ~12 KB maps alongside ~43-45 KB 3x3 conv kernels."
+  ]
+}

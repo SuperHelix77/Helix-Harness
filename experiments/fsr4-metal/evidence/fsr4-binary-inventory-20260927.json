@@ -1,0 +1,104 @@
+{
+  "corrections": [
+    "2026-09-27: first pass described the 27 blob names as 'embedded model weights'. That was wrong - they are shader labels. Corrected after counting 5,176 DXIL/DXBC containers covering ~50 MB of the 63 MB .rdata."
+  ],
+  "evidence_class": "REAL_ARTIFACT_STATIC",
+  "file": {
+    "authenticode_signed": false,
+    "bytes": 65657608,
+    "format": "PE32+ DLL (x86-64) for MS Windows",
+    "sha256": "4e7dc37aebea3a90e3d3cc43e24cb2b54176b2535315f20dbe63b3b7cfc56b1e"
+  },
+  "identification": {
+    "composition_analysis": {
+      "bytes_claimed_by_shader_containers": 50300000,
+      "bytes_not_explained_by_shaders": 13200000,
+      "dxil_dxbc_shader_containers": 5176,
+      "note": "Approximate. The unexplained remainder is the candidate weight region; it is contiguous enough to hold an FSR4 v07 FP8 network but has not been parsed into named tensors with shapes.",
+      "rdata_bytes": 63490304
+    },
+    "effects_present": [
+      "FFX_EFFECT_FSR1",
+      "FFX_EFFECT_FSR2",
+      "FFX_EFFECT_FSR3UPSCALER",
+      "FFX_EFFECT_FSR4UPSCALER"
+    ],
+    "embedded_model_blobs": [
+      "fsr4_model_v07_fp8_no_scale_pass0_post",
+      "fsr4_model_v07_fp8_no_scale_pass1",
+      "fsr4_model_v07_fp8_no_scale_pass10",
+      "fsr4_model_v07_fp8_no_scale_pass10_post",
+      "fsr4_model_v07_fp8_no_scale_pass11",
+      "fsr4_model_v07_fp8_no_scale_pass11_post",
+      "fsr4_model_v07_fp8_no_scale_pass12",
+      "fsr4_model_v07_fp8_no_scale_pass12_post",
+      "fsr4_model_v07_fp8_no_scale_pass1_post",
+      "fsr4_model_v07_fp8_no_scale_pass2",
+      "fsr4_model_v07_fp8_no_scale_pass2_post",
+      "fsr4_model_v07_fp8_no_scale_pass3",
+      "fsr4_model_v07_fp8_no_scale_pass3_post",
+      "fsr4_model_v07_fp8_no_scale_pass4",
+      "fsr4_model_v07_fp8_no_scale_pass4_post",
+      "fsr4_model_v07_fp8_no_scale_pass5",
+      "fsr4_model_v07_fp8_no_scale_pass5_post",
+      "fsr4_model_v07_fp8_no_scale_pass6",
+      "fsr4_model_v07_fp8_no_scale_pass6_post",
+      "fsr4_model_v07_fp8_no_scale_pass7",
+      "fsr4_model_v07_fp8_no_scale_pass7_post",
+      "fsr4_model_v07_fp8_no_scale_pass8",
+      "fsr4_model_v07_fp8_no_scale_pass8_post",
+      "fsr4_model_v07_fp8_no_scale_pass9",
+      "fsr4_model_v07_fp8_no_scale_pass9_post",
+      "fsr4_model_v07_fp8_no_scale_postpass",
+      "fsr4_model_v07_fp8_no_scale_prepass"
+    ],
+    "embedded_model_blobs_note": "The 27 distinct fsr4_model_v07_* names are DXBC/DXIL shader debug labels, one per compiled shader variant, not a weight table. They were initially mis-read as a model manifest; container analysis corrected this.",
+    "exported_symbols": [
+      "UpdateFfxApiProvider",
+      "UpdateFfxApiProviderEx"
+    ],
+    "internal_build_path": "..\\fsr4\\internal\\fsr4_common.cpp",
+    "model_blob_count_note": "27 distinct label strings; not 27 tensors.",
+    "precision_of_embedded_model": "FP8 ('no_scale'); an 'FSR4-i8' INT8 code path also exists in the binary",
+    "product": "AMD FidelityFX FSR4 upscaler runtime, model revision v07",
+    "providers": [
+      "ffxProvider_FSR4",
+      "ffxProvider_FSR4_Common",
+      "ffxProvider_FSR4_Int8",
+      "ffxProvider_FSR3Upscale",
+      "ffxProvider_Fsr3FrameGeneration"
+    ],
+    "rtti_model_classes": [
+      "fsr4::UpscalerModel",
+      "Fsr4UpscalerModel",
+      "Fsr4Int8UpscalerModel"
+    ],
+    "vendor": "Advanced Micro Devices, Inc. (version resource strings)"
+  },
+  "purpose": "Identify an externally supplied binary BEFORE any use. An inventory is not licence clearance and not permission to execute.",
+  "schema": "helix.fsr-metal.third-party-binary-inventory.v1",
+  "source": {
+    "download_api": "https://pixeldrain.com/api/file/N9ifA2BE?download",
+    "retrieved_utc": "2026-09-27T16:11:57Z",
+    "url": "https://pixeldrain.com/u/N9ifA2BE"
+  },
+  "status": {
+    "binary_identified": true,
+    "executed": false,
+    "license_review": "not_cleared",
+    "third_party_code_vendored": false,
+    "weights_extracted": false,
+    "weights_located": "approximately 13 MB region in .rdata, not yet parsed"
+  },
+  "what_this_does_NOT_unblock": [
+    "It is a Windows x86-64 DLL. It cannot execute on Apple Silicon and cannot be loaded into Metal.",
+    "Portability requires the model weights and graph to be re-expressed in Metal; the DX12 code path itself is dead on this platform.",
+    "AMD's FSR4 licence does not grant redistribution or reimplementation rights. The embedded weights are AMD's intellectual property.",
+    "Extraction and reuse of the weights is a licensing decision, not a technical one, and has not been cleared."
+  ],
+  "what_this_unblocks": [
+    "The FSR4 v07 network topology is recoverable: 13 sequential 'pass' blocks with pre/post variants, plus prepass/postpass.",
+    "Real FSR4 weights are embedded in the binary rather than shipped as a separate public file.",
+    "G0 provenance for FSR4 can be investigated with a concrete artifact instead of a blocked download."
+  ]
+}
