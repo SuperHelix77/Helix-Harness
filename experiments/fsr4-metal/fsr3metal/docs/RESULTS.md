@@ -94,6 +94,33 @@ possible smear), measurement on the last frame (the old dot has already left),
 and a control built from a lerp of background with background (which
 mathematically cannot exceed background). Only the third version can fail.
 
+## Performance, and it is not good enough
+
+Measured on this host with all variants interleaved per trial. Ratios are the
+durable number; absolute ms are not reproducible here (two clock states).
+
+| Output | spatial | +RCAS | full | full vs spatial | fps |
+|---|---:|---:|---:|---:|---:|
+| 1440p (3840x2160) | 0.89 ms | 1.88 ms | 5.84 ms | 6.6x | 171 |
+| 4K (7680x4320) | 3.49 ms | 7.57 ms | **23.24 ms** | 6.7x | **43** |
+
+**The full pipeline does not fit a 60 fps budget at 4K.** 23.24 ms against a
+16.67 ms budget. It clears 4K at 43 fps, which is playable but not what the
+objective asks for.
+
+The cost is almost entirely the temporal stage: spatial 3.49 ms, +RCAS
+7.57 ms, +temporal 23.24 ms. The accumulate pass alone costs about 16 ms, and
+it is the obvious optimisation target. Two causes, both fixable:
+
+1. The accumulate kernel is dispatched over every upscale pixel with a
+   per-pixel struct of ~140 bytes of parameters, so the whole 33M-pixel
+   parameter buffer is streamed twice per frame (write, then read). That is
+   far more bandwidth than the arithmetic needs.
+2. RCAS is in-place, so spatial and RCAS cannot overlap.
+
+Neither has been optimised yet. The numbers above are the honest starting
+point, not a result.
+
 ## Honest weaknesses
 
 - **The temporal stage does not improve RMSE at all** on this fixture. It is
