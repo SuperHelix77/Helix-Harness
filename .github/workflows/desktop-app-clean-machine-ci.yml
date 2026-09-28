@@ -249,16 +249,16 @@ jobs:
           # not merely a same-version upstream PyPI wheel. This catches the original
           # require_tool_access skew and missing adaptive-cycle modules.
           "$PY" - <<'PYHELIX'
-import pathlib, studio, sys
-root = pathlib.Path(studio.__file__).resolve().parent / "backend"
-sys.path.insert(0, str(root))
-from state.tool_policy import HELIX_HARNESS_BACKEND_CONTRACT, require_tool_access
-from core.helix_engine.controller import run_closed_loop
-assert HELIX_HARNESS_BACKEND_CONTRACT == "helix.adaptive.backend.v1"
-assert callable(require_tool_access)
-assert callable(run_closed_loop)
-print("Helix backend contract loaded", HELIX_HARNESS_BACKEND_CONTRACT)
-PYHELIX
+          import pathlib, studio, sys
+          root = pathlib.Path(studio.__file__).resolve().parent / "backend"
+          sys.path.insert(0, str(root))
+          from state.tool_policy import HELIX_HARNESS_BACKEND_CONTRACT, require_tool_access
+          from core.helix_engine.controller import run_closed_loop
+          assert HELIX_HARNESS_BACKEND_CONTRACT == "helix.adaptive.backend.v1"
+          assert callable(require_tool_access)
+          assert callable(run_closed_loop)
+          print("Helix backend contract loaded", HELIX_HARNESS_BACKEND_CONTRACT)
+          PYHELIX
 
           if [ -f ./clean-machine.env ]; then
             # A successful install alone is insufficient: uv treats install_name_tool
