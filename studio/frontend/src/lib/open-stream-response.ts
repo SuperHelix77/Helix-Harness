@@ -27,5 +27,9 @@ export async function openStreamResponse(
   if (response.status !== 405) {
     return response;
   }
-  return fetcher(url, { ...init, method: "GET" }, options);
+  // This response is discarded. Release its body before opening another stream,
+  // without awaiting a possibly stalled or rejected transport cancellation hook.
+  void response.body?.cancel().catch(() => undefined);
+  // RequestInit may carry a POST payload; Fetch forbids a body on a GET retry.
+  return fetcher(url, { ...init, method: "GET", body: undefined }, options);
 }

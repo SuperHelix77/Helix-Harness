@@ -63,15 +63,20 @@ export async function* readSseJsonEvents<T>(
       buffer = rest;
       for (const data of payloads) {
         if (data === "[DONE]") return;
+        let parsed: T;
         try {
-          yield JSON.parse(data) as T;
+          parsed = JSON.parse(data) as T;
         } catch {
-          // ignore unparseable frames; [DONE] still ends the loop
+          // Ignore malformed frames, not errors thrown into the generator by its consumer.
+          continue;
         }
+        yield parsed;
       }
     }
   } finally {
-    // release the stream lock now instead of leaking the reader until GC
+    // cancel() closes the source but does not release its reader lock. Do not
+    // await an underlying cancellation hook: it may reject or never settle.
     cancel();
+    reader.releaseLock();
   }
 }

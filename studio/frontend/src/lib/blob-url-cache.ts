@@ -45,9 +45,9 @@ export class BlobUrlCache {
 
   /** ``{id: url}``, for seeding a component's render state on mount. */
   toRecord(): Record<string, string> {
-    const out: Record<string, string> = {};
-    for (const [id, entry] of this.entries) out[id] = entry.url;
-    return out;
+    return Object.fromEntries(
+      [...this.entries].map(([id, entry]) => [id, entry.url]),
+    );
   }
 
   /** Mark ``id`` as most recently used. No-op for an id that is not cached. */
@@ -58,9 +58,16 @@ export class BlobUrlCache {
     this.entries.set(id, entry);
   }
 
-  /** Cache ``url`` for ``id``. Replacing an id revokes the URL it had. */
+  /** Cache ``url`` for ``id``. Revoke only a different, superseded URL. */
   set(id: string, url: string, bytes: number): void {
-    this.delete(id);
+    const previous = this.entries.get(id);
+    if (previous?.url === url) {
+      // Re-account and move to the MRU end without invalidating the live media.
+      this.entries.delete(id);
+      this.totalBytes -= previous.bytes;
+    } else {
+      this.delete(id);
+    }
     this.entries.set(id, { url, bytes });
     this.totalBytes += bytes;
   }
