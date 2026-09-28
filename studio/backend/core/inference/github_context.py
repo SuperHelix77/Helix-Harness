@@ -142,7 +142,6 @@ def _candidate_paths() -> list[Path]:
     home = Path.home()
     roots = [
         Path.cwd(),
-        home / "llmspeed-work",
         home / "Desktop",
         home / "Qwen",
         home / "projects",

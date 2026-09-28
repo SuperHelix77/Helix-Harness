@@ -104,8 +104,22 @@ def wait_tool_decision(
     approval_id,
     cancel_event=None,
     timeout=_DECISION_TIMEOUT,
+    fail_closed = False,
 ):
-    """Return allow/deny from durable state, or detach on non-Stop shutdown."""
+    """Return allow/deny from durable state, or detach on non-Stop shutdown.
+
+    ``fail_closed`` selects what a *model-visible* caller receives when the
+    durable approval worker detaches before deciding. The durable record is
+    untouched either way: detach never writes a denial and never expires the
+    approval, so an operator can still resolve it. The default raises, because
+    a caller that can act on the detach (a supervisor, a recovery pass) needs
+    to know it happened. A streaming tool loop cannot: it has already put a
+    status and a start event on the wire, so letting the exception escape kills
+    the whole stream and leaves the client with an empty thinking box and no
+    error frame. Those callers pass ``fail_closed=True`` and receive "deny" --
+    the same answer a user pressing Stop produces, which is the conservative
+    one: the call does not run, and the loop continues.
+    """
 
     run_id = str(slot.get("run_id") or "")
     deadline = time.monotonic() + max(0.0, float(timeout))
@@ -132,6 +146,8 @@ def wait_tool_decision(
                     ):
                         # request_cancel() committed the sourced denial in the
                         # same transaction as cancel_requested.
+                        return "deny"
+                    if fail_closed:
                         return "deny"
                     raise ToolApprovalDetached(
                         "durable tool approval worker detached before a decision"

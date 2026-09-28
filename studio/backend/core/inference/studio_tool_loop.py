@@ -1681,7 +1681,7 @@ async def stream_with_studio_tools(
                 if decision_slot is not None:
                     waiter = asyncio.ensure_future(
                         asyncio.to_thread(
-                            wait_tool_decision, decision_slot, approval_id, cancel_event
+                            wait_tool_decision, decision_slot, approval_id, cancel_event, fail_closed = True
                         )
                     )
                     try:

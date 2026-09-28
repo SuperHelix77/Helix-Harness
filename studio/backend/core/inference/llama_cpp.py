@@ -34614,6 +34614,12 @@ class LlamaCppBackend:
                                 decision_slot,
                                 approval_id,
                                 cancel_event = cancel_event,
+                                # A detached approval worker must not kill this stream: the
+                                # status and start events are already on the wire, so the client
+                                # would keep an empty thinking box with no error frame. deny is
+                                # the same answer Stop produces; the durable approval is left
+                                # untouched for an operator either way.
+                                fail_closed = True,
                             )
                             if decision_slot is not None
                             else None

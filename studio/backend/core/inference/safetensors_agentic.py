@@ -1668,15 +1668,31 @@ def _run_safetensors_tool_loop_impl(
                 }
                 yield start_event
 
-                _decision = (
-                    wait_tool_decision(
-                        decision_slot,
-                        approval_id,
-                        cancel_event = cancel_event,
+                #
+                # A detached approval worker (shutdown, or the durable owner
+                # going away mid-wait) used to propagate out of here and kill the
+                # whole SSE stream: the client had already been sent a status and
+                # a start event, so it sat with an empty thinking box and no
+                # answer, with no error frame to explain the silence. Detach is
+                # not permission. wait_tool_decision deliberately refuses to
+                # write a denial or expire the approval for it, and that stays
+                # true -- the decision here is only what THIS model-visible
+                # turn does next, which is the same fail-closed answer a user
+                # pressing Stop produces: the call is rejected, the loop
+                # continues, and the durable approval is left untouched for an
+                # operator to resolve.
+                try:
+                    _decision = (
+                        wait_tool_decision(
+                            decision_slot,
+                            approval_id,
+                            cancel_event = cancel_event,
+                        )
+                        if decision_slot is not None
+                        else None
                     )
-                    if decision_slot is not None
-                    else None
-                )
+                except ToolApprovalDetached:
+                    _decision = "deny"
                 if approval_id and _decision is not None:
                     from core.inference.durable_tool_journal import record_approval_decision
 

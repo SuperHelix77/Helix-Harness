@@ -13,7 +13,7 @@ Helix Harness is a local-first autonomous-agent workstation for macOS. Models ar
 Helix Harness is a fork and derivative of [**Unsloth Studio**](https://github.com/unslothai/unsloth), developed by the Unsloth AI Inc. team. Unsloth supplies the model-loading, training, quantized-inference, Apple-Silicon/MLX, GGUF/llama.cpp, and desktop foundation. Helix adds the durable control plane and product layer, with extensive engineering and validation under hostile conditions. This is not an upstream Unsloth release and does not imply endorsement. See [Credits](CREDITS.md) and [License](LICENSE).
 
 > [!WARNING]
-> **v3 is the first integrated Helix release and remains under active development.** The agent runtime, memory, evidence, and learning substrate are real, tested, and load-bearing. Some inherited Studio surfaces remain in transition, some controls/providers are incomplete, and interfaces and packaging will keep changing. Back up important data. The app is ad-hoc signed and not Apple-notarized.
+> **v3 is the first integrated Helix release and remains under active development.** The agent runtime, memory, evidence, and learning substrate are real and load-bearing. The v3 release gate was static package qualification (identity, signature, and bundle integrity) — not behavioral validation; the frozen hostile-audited baseline it carries forward is documented in [`docs/helix-reliability-baseline-v2.1-public.md`](docs/helix-reliability-baseline-v2.1-public.md). Some inherited Studio surfaces remain in transition, some controls/providers are incomplete, and interfaces and packaging will keep changing. Back up important data. The app is ad-hoc signed and not Apple-notarized.
 
 ---
 
@@ -25,9 +25,9 @@ We got the first two versions wrong in different ways.
 |---|---|---|
 | **v1** | The first attempt. An idea, poorly executed. | The ambition was right. The implementation wasn't a usable foundation. |
 | **v2** | We built the backend and durable runtime, but modules were **not tested together and not integrated properly**. | Individual modules passed in isolation. Put together, they did not hold up. |
-| **v3** | **The first integrated Helix release.** A frozen, reproducible reliability baseline, audited under hostile conditions. | Release-critical subsystems are tested together under crash, replay, recovery, concurrency, and hostile boundary conditions. |
+| **v3** | **The first integrated Helix release.** Carries the frozen v2.1 hostile-audited baseline forward, and adds static package qualification of the shipped artifact. | Release-critical subsystems are tested together under crash, replay, recovery, concurrency, and hostile boundary conditions **as part of the v2.1 baseline**. The v3 gate itself verified artifact identity, bundle integrity, and signature — see [`docs/helix-v3-release-evidence.json`](docs/helix-v3-release-evidence.json). |
 
-In v2, we mistook working parts for a working system. v3 is the first release to close that gap, with adversarial testing before shipping.
+In v2, we mistook working parts for a working system. v3 is the first release to close that gap, integrating the subsystems into one shipped artifact and qualifying that artifact before release.
 
 ---
 
@@ -82,7 +82,7 @@ Helix owns execution, context, memory, evidence, and learning; models supply bou
 
 ## What Helix owns (and why it matters)
 
-These subsystems are implemented and tested.
+These subsystems are implemented, and are carried forward from the v2.1 reliability baseline.
 
 | Subsystem | What it does | Why it's hard (and what Helix does about it) |
 |---|---|---|
@@ -104,9 +104,9 @@ These subsystems are implemented and tested.
 
 ## The reliability philosophy (why you'd trust this and not the marketing)
 
-v3 rests on the testing process. Extensive hostile testing of the backend mostly found things that were wrong: bugs to fix and hypotheses to reject.
+v3 rests on the testing process. Extensive hostile testing of the backend — recorded in the v2.1 reliability baseline — mostly found things that were wrong: bugs to fix and hypotheses to reject.
 
-Every optimization is measured against a **frozen, reproducible reliability baseline**, which serves as the release gate. The following invariants are enforced and regression-tested:
+Every optimization is measured against the **frozen, reproducible v2.1 reliability baseline**. v3 additionally applies a static package-qualification gate (artifact identity, bundle integrity, ad-hoc signature) over the bytes it ships. The following invariants are enforced and regression-tested as part of that baseline:
 
 - exact 80% adaptive checkpoint boundary + hard overflow safety
 - durable, idempotent checkpoint replay; no duplicated side effects after replay
@@ -121,7 +121,7 @@ Every optimization is measured against a **frozen, reproducible reliability base
 - evidence vs model-claim distinction; temporary-skill evidence gate
 - packaged backend identity; clean backend/process teardown
 
-Adversarial test classes include: kill after side-effect but before receipt, duplicate workers, duplicate event replay, frontend death, backend death, lost HTTP response, SQLite lock, stale runtime, Qdrant unavailable, disk/output pressure, huge stdout, cancellation at every boundary, foreground request during audit/training, account-crossover attempts, stale capability grants, symlink/path races, adaptive checkpoint during tools, and app restart during finalization.
+Adversarial test classes in the v2.1 baseline include: kill after side-effect but before receipt, duplicate workers, duplicate event replay, frontend death, backend death, lost HTTP response, SQLite lock, stale runtime, Qdrant unavailable, disk/output pressure, huge stdout, cancellation at every boundary, foreground request during audit/training, account-crossover attempts, stale capability grants, symlink/path races, adaptive checkpoint during tools, and app restart during finalization.
 
 ---
 

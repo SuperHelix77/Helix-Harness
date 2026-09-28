@@ -70,6 +70,22 @@ def _checkpoint(
     return value, hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
+
+def _fenced_worker(run_id: str = "run-receipt"):
+    """Read the run's current fenced ownership.
+
+    ``get_worker_run`` refuses an unauthenticated read once a run has been
+    claimed: the legacy two-argument form is only valid while the row is
+    unclaimed. Recovery callers must present the claim they were issued, which
+    ``get_recovery_snapshot(include_producer_claim=True)`` returns.
+    """
+    snapshot = db.get_recovery_snapshot(run_id, include_producer_claim=True)
+    if snapshot is None:
+        return None, None
+    _run, worker_token, _progress_at, claim = snapshot
+    worker = db.get_worker_run(run_id, worker_token, producer_claim=claim)
+    return worker, claim
+
 def _seed(run_id: str = "run-receipt") -> str:
     suffix = run_id.removeprefix("run-")
     thread_id = f"thread-{suffix}"
@@ -108,7 +124,7 @@ def _seed(run_id: str = "run-receipt") -> str:
             "finalization_idempotency_key": run_id,
         },
     )
-    worker = db.get_worker_run(run_id)
+    worker, _claim = _fenced_worker(run_id)
     assert worker is not None
     token = worker[2]
     assert db.mark_running(run_id, token)
@@ -500,15 +516,21 @@ def test_claimed_row_takeover_keeps_execution_and_checkpoint_identity():
         stale_before_ms=db.now_ms() + 1000,
     )
     assert requeued is not None
-    replacement_worker = db.get_worker_run("run-receipt")
+    replacement_worker, replacement_claim = _fenced_worker("run-receipt")
     assert replacement_worker is not None
     replacement = replacement_worker[2]
-    assert db.mark_running("run-receipt", replacement)
+    # requeue_run_for_restart already rotates the worker token and the producer
+    # epoch, so the claim read above IS the new producer's claim. Present it to
+    # admit the run; every later write must present the same one.
+    assert db.mark_running(
+        "run-receipt", replacement, producer_claim=replacement_claim
+    )
     checkpoint = claimed["preToolCheckpoint"]
     replay = db.claim_ungated_tool_execution(
         "run-receipt",
         "execution-1",
         worker_token=replacement,
+        producer_claim=replacement_claim,
         backend_account_id=current_account_id(),
         session_id="session-1",
         thread_id="thread-receipt",
@@ -1797,10 +1819,12 @@ def test_double_restart_advances_sibling_without_duplicate_end_or_rerun():
     [requeued] = recovery.requeue_planned_runs(
         [first_plan], stale_before_ms=db.now_ms() + 1000
     )
-    first_worker = db.get_worker_run("run-receipt")
+    first_worker, first_claim = _fenced_worker("run-receipt")
     assert first_worker is not None
     first_worker_token = first_worker[2]
-    assert db.mark_running("run-receipt", first_worker_token)
+    assert db.mark_running(
+        "run-receipt", first_worker_token, producer_claim=first_claim
+    )
     resumed_checkpoint = requeued["_resumeCheckpoint"]
     conversation = list(resumed_checkpoint["conversation"])
     controller = ToolLoopController(
@@ -1820,7 +1844,9 @@ def test_double_restart_advances_sibling_without_duplicate_end_or_rerun():
         producer_calls.append(arguments["command"])
         return "second-result"
 
-    with durable_tool_run("run-receipt", first_worker_token):
+    with durable_tool_run(
+        "run-receipt", first_worker_token, producer_claim=first_claim
+    ):
         first_resume = resume_checkpoint_calls(
             resumed_checkpoint,
             backend="gguf",
@@ -1845,6 +1871,7 @@ def test_double_restart_advances_sibling_without_duplicate_end_or_rerun():
                     "run-receipt",
                     first_worker_token,
                     [("chunk", event, db.now_ms())],
+                    producer_claim=first_claim,
                 )
             elif event.get("type") == "tool_end":
                 second_end = event
@@ -1883,10 +1910,12 @@ def test_double_restart_advances_sibling_without_duplicate_end_or_rerun():
     [requeued_again] = recovery.requeue_planned_runs(
         [second_plan], stale_before_ms=db.now_ms() + 1000
     )
-    second_worker = db.get_worker_run("run-receipt")
+    second_worker, second_claim = _fenced_worker("run-receipt")
     assert second_worker is not None
     second_worker_token = second_worker[2]
-    assert db.mark_running("run-receipt", second_worker_token)
+    assert db.mark_running(
+        "run-receipt", second_worker_token, producer_claim=second_claim
+    )
     replay_controller = ToolLoopController(
         tools=[{"type": "function", "function": {"name": "terminal"}}]
     )
@@ -1894,7 +1923,9 @@ def test_double_restart_advances_sibling_without_duplicate_end_or_rerun():
         "record_result reran on the second restart"
     )
     replay_conversation = list(requeued_again["_resumeCheckpoint"]["conversation"])
-    with durable_tool_run("run-receipt", second_worker_token):
+    with durable_tool_run(
+        "run-receipt", second_worker_token, producer_claim=second_claim
+    ):
         second_resume = resume_checkpoint_calls(
             requeued_again["_resumeCheckpoint"],
             backend="gguf",

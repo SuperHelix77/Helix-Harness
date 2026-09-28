@@ -32,6 +32,27 @@ class RecoveryPlan:
     expected_worker_token: str | None = None
     expected_progress_at: int | None = None
     expected_last_event_seq: int | None = None
+    # The exact physical-producer ownership observed at planning time. Carried
+    # into the requeue CAS so a producer rotation between planning and takeover
+    # is a detected conflict rather than a silent takeover.
+    expected_producer_claim: Any | None = None
+
+
+def _claim_identity(claim: Any | None) -> tuple[Any, ...]:
+    """Comparable identity of a physical-producer claim.
+
+    The secret token never leaves the storage layer, so recovery compares the
+    tuple structurally: a rotation between planning and takeover changes it and
+    the requeue CAS fails closed instead of silently taking over a run that now
+    belongs to a newer producer.
+    """
+    if claim is None:
+        return (None, None, "")
+    return (
+        str(getattr(claim, "run_id", "") or ""),
+        getattr(claim, "epoch", None),
+        str(getattr(claim, "token", "") or ""),
+    )
 
 
 _RECOVERY_EVENT_PAGE_SIZE = 10_000
@@ -1425,11 +1446,11 @@ def plan_orphaned_runs() -> list[RecoveryPlan]:
         if run.get("status") == "cancelling" or run.get("cancelRequested") is True:
             plans.append(RecoveryPlan(run_id, False, "explicit_stop_was_pending"))
             continue
-        snapshot = runs_db.get_recovery_snapshot(run_id)
+        snapshot = runs_db.get_recovery_snapshot(run_id, include_producer_claim=True)
         if snapshot is None:
             plans.append(RecoveryPlan(run_id, False, "ownership_changed_during_planning"))
             continue
-        run, worker_token, progress_at = snapshot
+        run, worker_token, progress_at, producer_claim = snapshot
         last_event_seq = int(run.get("lastEventSeq") or 0)
         request_payload = run.get("requestPayload")
         if not isinstance(request_payload, dict):
@@ -1442,15 +1463,17 @@ def plan_orphaned_runs() -> list[RecoveryPlan]:
             public_spans, span_error = _public_tool_spans(events)
             approvals = runs_db.list_tool_approvals(run_id, include_checkpoint=True)
             executions = runs_db.list_ungated_tool_executions(run_id)
-            refreshed = runs_db.get_recovery_snapshot(run_id)
+            refreshed = runs_db.get_recovery_snapshot(run_id, include_producer_claim=True)
             if refreshed is None:
                 plan = RecoveryPlan(run_id, False, "recovery_event_snapshot_changed")
             else:
-                refreshed_run, refreshed_token, refreshed_progress = refreshed
+                refreshed_run, refreshed_token, refreshed_progress, refreshed_claim = refreshed
                 if (
                     refreshed_token != worker_token
                     or refreshed_progress != progress_at
                     or int(refreshed_run.get("lastEventSeq") or 0) != last_event_seq
+                    or _claim_identity(refreshed_claim)
+                        != _claim_identity(producer_claim)
                 ):
                     plan = RecoveryPlan(run_id, False, "recovery_event_snapshot_changed")
                 elif span_error is not None or public_spans is None:
@@ -1509,6 +1532,7 @@ def plan_orphaned_runs() -> list[RecoveryPlan]:
                 worker_token,
                 progress_at,
                 last_event_seq,
+                producer_claim,
             )
         )
     return plans
@@ -1530,6 +1554,7 @@ def requeue_planned_runs(
             expected_worker_token=plan.expected_worker_token,
             expected_progress_at=plan.expected_progress_at,
             expected_last_event_seq=plan.expected_last_event_seq,
+            expected_producer_claim=plan.expected_producer_claim,
             stale_before_ms=stale_before_ms,
         )
         if run is not None:

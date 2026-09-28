@@ -339,6 +339,30 @@ def _finish_candidate(
         "projection": projection,
         "fallback_result": fallback_result,
         "is_error": False,
+        # The immutable pricing decision the storage gate requires before a
+        # candidate may be published. It must agree with the request-scoped
+        # binding carried on the exposure, so a later publisher cannot
+        # reinterpret the token count under a different request.
+        "request_binding_id": "binding-test-1",
+        "budget_epoch": "epoch-1",
+        "serving_generation_id": "gen-1",
+        "admission_decision": {
+            "admitted": True,
+            "reason": "admitted",
+            "request_binding_id": "binding-test-1",
+            "budget_epoch": "epoch-1",
+            "serving_generation_id": "gen-1",
+            "active_result_budget_tokens": 4096,
+            "projection_token_count": 12,
+            # The decision commits to the exact bytes it priced, so a candidate
+            # cannot be re-pointed at different content after admission.
+            "projection_sha256": hashlib.sha256(
+                projection.encode("utf-8", "surrogatepass")
+            ).hexdigest(),
+            "fallback_sha256": hashlib.sha256(
+                fallback_result.encode("utf-8", "surrogatepass")
+            ).hexdigest(),
+        },
     }
     values.update(overrides)
     return values

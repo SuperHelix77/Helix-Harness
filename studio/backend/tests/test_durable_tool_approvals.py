@@ -11,8 +11,18 @@ import threading
 import pytest
 
 from core.inference import durable_agent_recovery as recovery
+from core.inference import durable_tool_journal as journal
 from core.inference.durable_agent_recovery import plan_orphaned_runs
-from core.inference.durable_tool_journal import durable_tool_run
+from core.inference.durable_tool_journal import (
+    DurableExecutionHandle,
+    DurableToolJournalError,
+    append_tool_proposal,
+    current_durable_run_claim,
+    durable_tool_run,
+    proposal_envelope,
+    record_execution_finished,
+    record_execution_started,
+)
 from state import tool_approvals
 from storage import chat_generation_runs_db as db
 from storage import studio_db
@@ -239,6 +249,284 @@ def test_checkpoint_call_mismatch_rolls_back_public_event():
     assert db.get_tool_approval("run-approval", "approval-1") is None
 
 
+def test_private_tool_proposal_carries_exact_four_part_producer_claim():
+    token = _seed()
+    with durable_tool_run(
+        "run-approval",
+        token,
+        producer_epoch=7,
+        producer_token="producer-live",
+    ):
+        claim = current_durable_run_claim()
+        assert claim is not None
+        proposal = proposal_envelope(
+            approval_id="approval-1",
+            session_id="session-1",
+            tool_name="terminal",
+            tool_call_id="call-1",
+            card_call_id="call-1",
+            arguments={"command": "pwd"},
+            resume_checkpoint=_checkpoint(),
+        )
+    assert proposal is not None
+    assert proposal["producer_claim"] == {
+        "run_id": "run-approval",
+        "worker_token": token,
+        "producer_epoch": 7,
+        "producer_token": "producer-live",
+    }
+
+
+def test_append_tool_proposal_forwards_exact_producer_claim(monkeypatch):
+    token = _seed()
+    claim = db.ProducerClaim(
+        run_id="run-approval",
+        worker_token=token,
+        epoch=7,
+        token="producer-live",
+    )
+    seen: dict[str, object] = {}
+
+    def append(
+        run_id: str,
+        worker_token: str,
+        events,
+        proposal,
+        *,
+        producer_claim,
+    ):
+        seen.update(
+            run_id=run_id,
+            worker_token=worker_token,
+            events=events,
+            proposal=proposal,
+            producer_claim=producer_claim,
+        )
+        return [4]
+
+    monkeypatch.setattr(db, "append_events_with_tool_proposal", append)
+    with durable_tool_run(
+        "run-approval",
+        token,
+        producer_claim=claim,
+    ):
+        private = proposal_envelope(
+            approval_id="approval-1",
+            session_id="session-1",
+            tool_name="terminal",
+            tool_call_id="call-1",
+            card_call_id="call-1",
+            arguments={"command": "pwd"},
+            resume_checkpoint=_checkpoint(),
+        )
+        assert private is not None
+        assert append_tool_proposal(
+            [("chunk", {"type": "tool_start"}, 100)],
+            private,
+        ) == [4]
+    assert seen["run_id"] == "run-approval"
+    assert seen["worker_token"] == token
+    assert seen["producer_claim"] is claim
+
+
+def test_execution_creation_forwards_exact_producer_claim(monkeypatch):
+    token = _seed()
+    claim = db.ProducerClaim(
+        run_id="run-approval",
+        worker_token=token,
+        epoch=7,
+        token="producer-live",
+    )
+    seen: dict[str, object] = {}
+
+    def get_worker_run(run_id, worker_token, *, producer_claim):
+        seen["worker_producer_claim"] = producer_claim
+        return (
+            {"id": run_id, "threadId": "thread-approval"},
+            "alice",
+            worker_token,
+        )
+
+    def claim_execution(run_id, execution_id, **kwargs):
+        seen["execution_producer_claim"] = kwargs["producer_claim"]
+        return {
+            "executionId": execution_id,
+            "claimToken": "execution-claim",
+            "executionState": "claimed",
+        }
+
+    monkeypatch.setattr(db, "get_worker_run", get_worker_run)
+    monkeypatch.setattr(db, "claim_ungated_tool_execution", claim_execution)
+    with durable_tool_run(
+        "run-approval",
+        token,
+        producer_claim=claim,
+    ):
+        execution = journal.claim_execution(
+            "terminal",
+            "call-1",
+            card_call_id="call-1",
+            arguments={"command": "pwd"},
+            session_id="session-1",
+            thread_id="thread-approval",
+            pre_tool_checkpoint=_checkpoint(),
+        )
+    assert execution is not None
+    assert (execution.producer_epoch, execution.producer_token) == (
+        claim.epoch,
+        claim.token,
+    )
+    assert seen["worker_producer_claim"] is claim
+    assert seen["execution_producer_claim"] is claim
+
+
+@pytest.mark.parametrize("authority_kind", ["approved", "ungated"])
+def test_execution_start_and_finish_forward_exact_producer_claim(
+    monkeypatch,
+    authority_kind,
+):
+    token = _seed()
+    claim = db.ProducerClaim(
+        run_id="run-approval",
+        worker_token=token,
+        epoch=7,
+        token="producer-live",
+    )
+    execution = DurableExecutionHandle(
+        execution_id="execution-1",
+        run_id=claim.run_id,
+        worker_token=claim.worker_token,
+        approval_id="approval-1",
+        claim_token="execution-claim",
+        pre_tool_checkpoint_digest="checkpoint-digest",
+        authority_kind=authority_kind,
+        producer_epoch=claim.epoch,
+        producer_token=claim.token,
+    )
+    started_claims: list[object] = []
+    finished_claims: list[object] = []
+
+    def started(*_args, **kwargs):
+        started_claims.append(kwargs["producer_claim"])
+        return {"executionState": "started"}
+
+    def finished(*_args, **kwargs):
+        finished_claims.append(kwargs["producer_claim"])
+        return {"executionState": "finished"}
+
+    monkeypatch.setattr(db, "mark_tool_execution_started", started)
+    monkeypatch.setattr(db, "mark_ungated_tool_execution_started", started)
+    monkeypatch.setattr(db, "finish_tool_execution", finished)
+    monkeypatch.setattr(db, "finish_ungated_tool_execution", finished)
+    with durable_tool_run(
+        claim.run_id,
+        claim.worker_token,
+        producer_claim=claim,
+    ):
+        journal._CLAIMED_EXECUTION.set(execution)
+        assert record_execution_started("terminal", "call-1") is execution
+        assert record_execution_finished(
+            execution,
+            tool_name="terminal",
+            tool_call_id="call-1",
+            result="ok",
+            controller_is_error=False,
+            completion_annotations={},
+            post_controller_checkpoint={"version": 1},
+        ) == {"executionState": "finished"}
+    assert started_claims == [claim]
+    assert finished_claims == [claim]
+
+
+def test_replaced_producer_claim_cannot_start_or_finish_execution(monkeypatch):
+    token = _seed()
+    old_claim = db.ProducerClaim(
+        run_id="run-approval",
+        worker_token=token,
+        epoch=1,
+        token="producer-old",
+    )
+    current_claim = db.ProducerClaim(
+        run_id="run-approval",
+        worker_token=token,
+        epoch=2,
+        token="producer-current",
+    )
+    execution = DurableExecutionHandle(
+        execution_id="execution-old",
+        run_id=old_claim.run_id,
+        worker_token=old_claim.worker_token,
+        producer_epoch=old_claim.epoch,
+        producer_token=old_claim.token,
+    )
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("stale execution reached a storage mutation")
+
+    monkeypatch.setattr(db, "mark_tool_execution_started", forbidden)
+    monkeypatch.setattr(db, "mark_ungated_tool_execution_started", forbidden)
+    monkeypatch.setattr(db, "finish_tool_execution", forbidden)
+    monkeypatch.setattr(db, "finish_ungated_tool_execution", forbidden)
+    with durable_tool_run(
+        current_claim.run_id,
+        current_claim.worker_token,
+        producer_claim=current_claim,
+    ):
+        journal._CLAIMED_EXECUTION.set(execution)
+        with pytest.raises(DurableToolJournalError):
+            record_execution_started("terminal", "call-1")
+        with pytest.raises(DurableToolJournalError):
+            record_execution_finished(
+                execution,
+                tool_name="terminal",
+                tool_call_id="call-1",
+            )
+
+
+def test_mismatched_producer_claim_cannot_create_approval(monkeypatch):
+    token = _seed()
+    proposal = _proposal()
+    before_seq = db.get_run("run-approval")["lastEventSeq"]
+    monkeypatch.setattr(
+        db,
+        "append_events_with_tool_proposal",
+        lambda *_args, **_kwargs: pytest.fail(
+            "mismatched proposal reached the storage transaction"
+        ),
+    )
+    with durable_tool_run(
+        "run-approval",
+        token,
+        producer_claim=db.ProducerClaim(
+            run_id="run-approval",
+            worker_token=token,
+            epoch=1,
+            token="producer-live",
+        ),
+    ):
+        with pytest.raises(DurableToolJournalError):
+            append_tool_proposal(
+                [("chunk", {"type": "tool_start"})],
+                {
+                    **proposal,
+                    "producer_claim": {
+                        "run_id": "run-approval",
+                        "worker_token": token,
+                        "producer_epoch": 1,
+                        "producer_token": "producer-stale",
+                    },
+                },
+            )
+    assert db.get_tool_approval("run-approval", "approval-1") is None
+    assert db.get_run("run-approval")["lastEventSeq"] == before_seq
+    assert not [
+        event
+        for event in db.list_events("run-approval")
+        if event["type"] == "chunk"
+        and event["payload"].get("type") == "tool_start"
+    ]
+
+
 def test_exact_run_and_approval_ids_are_account_scoped():
     alice = AccountContext("a" * 32, "alice")
     bob = AccountContext("b" * 32, "bob")
@@ -307,6 +595,32 @@ def test_decision_committed_without_notification_is_observed_before_wait():
         assert tool_approvals.wait_tool_decision(slot, "approval-1", timeout=0.01) == "allow"
 
 
+def test_fail_closed_waiter_denies_instead_of_raising():
+    # The streaming tool loops already put a status and a start event on the
+    # wire before they wait, so a detached approval worker propagating out of
+    # wait_tool_decision killed the whole SSE stream: the client kept an empty
+    # thinking box and no error frame. A caller that can act on a detach still
+    # gets the exception (the test above); a model-visible one asks for the
+    # fail-closed answer instead, which is the same "deny" a user pressing Stop
+    # produces. The durable approval is left untouched in both cases.
+    token = _seed()
+    _persist(token)
+    stopped = threading.Event()
+    stopped.set()
+    with durable_tool_run("run-approval", token):
+        slot = tool_approvals.begin_tool_decision("session-1", "approval-1")
+        assert (
+            tool_approvals.wait_tool_decision(
+                slot, "approval-1", cancel_event=stopped, fail_closed=True
+            )
+            == "deny"
+        )
+    # Still no denial written and no expiry mutation: fail_closed is a
+    # model-visible decision, not a durable one.
+    after = db.get_tool_approval("run-approval", "approval-1")
+    assert after.get("decision") not in {"allow", "deny"}
+
+
 def test_shutdown_detaches_without_denial_or_expiry_change():
     token = _seed()
     _persist(token)
@@ -373,6 +687,7 @@ def test_claim_without_start_is_reclaimed_only_by_fenced_takeover():
         [plan], stale_before_ms=plan.expected_progress_at
     )
     new_token = recovered["_workerToken"]
+    producer_claim = recovered["_producerClaim"]
     reset = db.get_tool_approval("run-approval", "approval-1")
     assert reset["executionState"] == "unclaimed"
     assert reset["executionId"] == execution_id
@@ -383,7 +698,10 @@ def test_claim_without_start_is_reclaimed_only_by_fenced_takeover():
         claim_token=claimed["claimToken"],
     ) is None
     reclaimed = db.claim_tool_execution(
-        "run-approval", "approval-1", worker_token=new_token
+        "run-approval",
+        "approval-1",
+        worker_token=new_token,
+        producer_claim=producer_claim,
     )
     assert reclaimed["executionId"] == execution_id
 

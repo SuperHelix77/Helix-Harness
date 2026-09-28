@@ -11,7 +11,7 @@ from __future__ import annotations
 import hashlib
 import os
 from dataclasses import asdict, dataclass, field
-from typing import Any, Iterator
+from typing import Any, Callable, Iterator
 
 
 PRODUCER_RECEIPT_VERSION = 1
@@ -100,8 +100,36 @@ class ResultBudgetExposure:
     active_result_budget_tokens: int | None
     served_context_tokens: int | None
     pricing_mode: str
+    # Binding identity latched with the exposure. A later observation publisher
+    # must not reinterpret these numbers under a different request, budget epoch,
+    # or serving generation, so the tuple travels with the exposure and is
+    # re-verified at admission. Optional, so a plain fit that never had
+    # request-scoped pricing still validates.
+    request_binding_id: str | None = None
+    budget_epoch: str | None = None
+    serving_generation_id: str | None = None
+    # Exact tokenizer projection for this request when one is available.
+    # Intentionally never serialized.
+    exact_projection_pricer: Callable[..., int] | None = field(
+        default=None, repr=False, compare=False
+    )
 
     def is_valid(self) -> bool:
+        # A half-present binding tuple is not a binding: if any part of the
+        # request-scoped identity is set, all of it must be a nonempty string.
+        binding = (
+            self.request_binding_id,
+            self.budget_epoch,
+            self.serving_generation_id,
+        )
+        if any(part is not None for part in binding) and not all(
+            isinstance(part, str) and part for part in binding
+        ):
+            return False
+        if self.exact_projection_pricer is not None and not callable(
+            self.exact_projection_pricer
+        ):
+            return False
         if self.pricing_mode not in RESULT_BUDGET_PRICING_MODES:
             return False
         if self.active_result_budget_tokens is not None and (
@@ -144,6 +172,11 @@ class ObservationSeed:
             pricing_mode="unpriced",
         )
     )
+    # The producer's own recovery pointer: how much was kept, how much was
+    # dropped, and how to reach the rest. It travels with the seed so a later
+    # ObservationPack builder can keep the pointer to truncated evidence alive
+    # instead of publishing a head that looks complete.
+    preserved_hint: str | None = None
 
     def is_valid(self) -> bool:
         digest, length = _utf8_facts(self.canonical_text)
@@ -153,6 +186,7 @@ class ObservationSeed:
             and OBSERVATION_SEED_MIN_BYTES <= length <= OBSERVATION_SEED_MAX_BYTES
             and isinstance(self.result_budget_exposure, ResultBudgetExposure)
             and self.result_budget_exposure.is_valid()
+            and (self.preserved_hint is None or isinstance(self.preserved_hint, str))
         )
 
 
@@ -160,6 +194,7 @@ def observation_seed_for_text(
     text: str | None,
     *,
     result_budget_exposure: ResultBudgetExposure | None = None,
+    preserved_hint: str | None = None,
 ) -> ObservationSeed | None:
     """Build a bounded private seed from canonical post-defuse text."""
 
@@ -180,6 +215,7 @@ def observation_seed_for_text(
         canonical_text_utf8_surrogatepass_sha256=digest,
         canonical_text_utf8_surrogatepass_byte_length=length,
         result_budget_exposure=exposure,
+        preserved_hint=preserved_hint if isinstance(preserved_hint, str) else None,
     )
 
 

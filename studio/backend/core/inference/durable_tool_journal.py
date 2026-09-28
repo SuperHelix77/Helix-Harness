@@ -32,6 +32,8 @@ class DurableExecutionHandle:
     claim_token: str = ""
     pre_tool_checkpoint_digest: str = ""
     authority_kind: str = "ungated"
+    producer_epoch: int | None = None
+    producer_token: str = field(default="", repr=False, compare=False)
     replay_completion: dict[str, Any] | None = field(default=None, compare=False)
 
 
@@ -56,6 +58,9 @@ _RESUME_CHECKPOINT: contextvars.ContextVar[dict[str, Any] | None] = contextvars.
 _CLAIMED_EXECUTION: contextvars.ContextVar[DurableExecutionHandle | None] = (
     contextvars.ContextVar("helix_durable_tool_claim", default=None)
 )
+_PRODUCER_CLAIM: contextvars.ContextVar[runs_db.ProducerClaim | None] = (
+    contextvars.ContextVar("helix_durable_tool_producer_claim", default=None)
+)
 
 
 @contextmanager
@@ -64,14 +69,26 @@ def durable_tool_run(
     worker_token: str,
     *,
     resume_checkpoint: dict[str, Any] | None = None,
+    producer_claim: "runs_db.ProducerClaim | None" = None,
+    producer_epoch: int | None = None,
+    producer_token: str = "",
 ) -> Iterator[None]:
     current_token = _CURRENT.set((str(run_id), str(worker_token)))
     approval_token = _NEXT_APPROVAL.set(None)
     resume_token = _RESUME_CHECKPOINT.set(resume_checkpoint)
     claim_token = _CLAIMED_EXECUTION.set(None)
+    if producer_claim is None and (producer_epoch is not None or producer_token):
+        producer_claim = runs_db.ProducerClaim(
+            run_id=str(run_id),
+            worker_token=str(worker_token),
+            epoch=producer_epoch,
+            token=str(producer_token),
+        )
+    producer_token = _PRODUCER_CLAIM.set(producer_claim)
     try:
         yield
     finally:
+        _PRODUCER_CLAIM.reset(producer_token)
         _CLAIMED_EXECUTION.reset(claim_token)
         _RESUME_CHECKPOINT.reset(resume_token)
         _NEXT_APPROVAL.reset(approval_token)
@@ -80,6 +97,16 @@ def durable_tool_run(
 
 def current_durable_tool_run() -> tuple[str, str] | None:
     return _CURRENT.get()
+
+
+def current_durable_run_claim() -> "runs_db.ProducerClaim | None":
+    """Backend-only physical-producer ownership for the active durable run.
+
+    The epoch/token pair is never projected through the public run representation
+    or the frontend event stream; it exists so a writer can be fenced against a
+    superseded physical producer attempt.
+    """
+    return _PRODUCER_CLAIM.get()
 
 
 def current_resume_checkpoint(*, backend: str | None = None) -> dict[str, Any] | None:
@@ -151,6 +178,7 @@ def proposal_envelope(
     if int(checkpoint.get("version") or 0) != CHECKPOINT_VERSION:
         raise DurableToolJournalError("unsupported durable checkpoint version")
     _encoded, fingerprint = _canonical_arguments(arguments)
+    producer_claim = _PRODUCER_CLAIM.get()
     proposed_at = runs_db.now_ms()
     return {
         "schema_version": "helix.tool-approval.v2",
@@ -165,6 +193,18 @@ def proposal_envelope(
         "checkpoint_version": CHECKPOINT_VERSION,
         "resume_checkpoint": checkpoint,
         "proposed_at": proposed_at,
+        "producer_claim": {
+            "run_id": str(producer_claim.run_id) if producer_claim is not None else run_id,
+            "worker_token": (
+                str(producer_claim.worker_token) if producer_claim is not None else worker_token
+            ),
+            "producer_epoch": (
+                producer_claim.epoch if producer_claim is not None else None
+            ),
+            "producer_token": (
+                str(producer_claim.token) if producer_claim is not None else ""
+            ),
+        },
         "expires_at": int(expires_at or (proposed_at + APPROVAL_TTL_MS)),
     }
 
@@ -189,6 +229,58 @@ def _append(event_type: str, payload: dict[str, Any]) -> int | None:
             f"Durable run no longer accepts {event_type}; tool execution was fenced"
         )
     return int(sequences[0])
+
+
+def _handle_claim(execution: DurableExecutionHandle) -> "runs_db.ProducerClaim | None":
+    """Rebuild the fenced producer claim for a claimed execution.
+
+    The epoch/token pair identifies one physical producer attempt. Forwarding it
+    on every durable write is what stops a superseded producer from starting or
+    finishing an execution it no longer owns.
+    """
+    if execution.producer_epoch is None and not execution.producer_token:
+        return None
+    return runs_db.ProducerClaim(
+        run_id=execution.run_id,
+        worker_token=execution.worker_token,
+        epoch=execution.producer_epoch,
+        token=execution.producer_token,
+    )
+
+
+def append_tool_proposal(
+    events: list[tuple[str, dict[str, Any], int]],
+    proposal: dict[str, Any],
+) -> list[int]:
+    """Commit buffered output, the public ``tool_start`` and its private checkpoint.
+
+    This is a single writer transaction so a public approval card can never
+    outrun the server-only state needed to resolve or recover it. The exact
+    ``producer_claim`` object bound to the active durable run is forwarded
+    unchanged: the epoch/token pair is the fencing identity, so substituting a
+    reconstructed equivalent would let a superseded physical producer append.
+    """
+    bound = _CURRENT.get()
+    if bound is None:
+        return []
+    run_id, worker_token = bound
+    try:
+        sequences = runs_db.append_events_with_tool_proposal(
+            run_id,
+            worker_token,
+            events,
+            proposal,
+            producer_claim=_PRODUCER_CLAIM.get(),
+        )
+    except BaseException as exc:
+        raise DurableToolJournalError(
+            "Could not persist the durable tool proposal before continuing the durable agent run"
+        ) from exc
+    if not sequences:
+        raise DurableToolJournalError(
+            "Durable run no longer accepts the tool proposal; tool execution was fenced"
+        )
+    return [int(sequence) for sequence in sequences]
 
 
 def _ungated_execution_id(run_id: str, tool_call_id: str, card_call_id: str) -> str:
@@ -221,7 +313,10 @@ def claim_execution(
         pre_tool_checkpoint
     )
     card_call_id = str(card_call_id or tool_call_id or "")
-    worker_run = runs_db.get_worker_run(run_id, worker_token)
+    producer_claim = _PRODUCER_CLAIM.get()
+    worker_run = runs_db.get_worker_run(
+        run_id, worker_token, producer_claim=producer_claim
+    )
     if worker_run is None:
         raise DurableToolJournalError("durable tool worker ownership was fenced")
     run, _owner, _token = worker_run
@@ -262,6 +357,7 @@ def claim_execution(
             tool_call_id=tool_call_id,
             card_call_id=card_call_id,
             arguments=actual_arguments,
+            producer_claim=producer_claim,
         )
         if claimed is None:
             raise DurableToolJournalError("approved tool execution could not be claimed")
@@ -273,6 +369,8 @@ def claim_execution(
             claim_token=str(claimed.get("claimToken") or ""),
             pre_tool_checkpoint_digest=checkpoint_digest,
             authority_kind="approved",
+            producer_epoch=producer_claim.epoch if producer_claim is not None else None,
+            producer_token=(producer_claim.token if producer_claim is not None else ""),
             replay_completion=(
                 claimed.get("completion")
                 if claimed.get("executionState") in {"finished", "ambiguous"}
@@ -296,6 +394,7 @@ def claim_execution(
         arguments=actual_arguments,
         pre_tool_checkpoint=frozen_checkpoint,
         pre_tool_checkpoint_digest=checkpoint_digest,
+        producer_claim=producer_claim,
     )
     if claimed is None:
         raise DurableToolJournalError("ungated tool execution could not be claimed")
@@ -306,6 +405,8 @@ def claim_execution(
         claim_token=str(claimed.get("claimToken") or ""),
         pre_tool_checkpoint_digest=checkpoint_digest,
         authority_kind="ungated",
+        producer_epoch=producer_claim.epoch if producer_claim is not None else None,
+        producer_token=(producer_claim.token if producer_claim is not None else ""),
         replay_completion=(
             claimed.get("completion")
             if claimed.get("executionState") in {"finished", "ambiguous"}
@@ -316,6 +417,30 @@ def claim_execution(
     return handle
 
 
+def _require_current_producer(execution: DurableExecutionHandle) -> None:
+    """Refuse a durable write from a superseded physical producer.
+
+    A claimed execution carries the epoch/token of the producer attempt that
+    created it. If the active durable run has since been taken over by a newer
+    producer, the old attempt must not start or finish anything -- not even
+    optimistically, and not even to discover the fence at the storage layer.
+    """
+    active = _PRODUCER_CLAIM.get()
+    if active is None:
+        return
+    if (
+        execution.producer_epoch is not None
+        or execution.producer_token
+    ):
+        if (
+            execution.producer_epoch != active.epoch
+            or str(execution.producer_token) != str(active.token)
+        ):
+            raise DurableToolJournalError(
+                "durable tool execution belongs to a superseded producer attempt"
+            )
+
+
 def record_execution_started(
     tool_name: str,
     tool_call_id: str,
@@ -324,6 +449,7 @@ def record_execution_started(
     _CLAIMED_EXECUTION.set(None)
     if execution is None:
         return None
+    _require_current_producer(execution)
     if execution.replay_completion is not None:
         return execution
     if execution.authority_kind == "approved":
@@ -332,6 +458,7 @@ def record_execution_started(
             execution.approval_id,
             worker_token=execution.worker_token,
             claim_token=execution.claim_token,
+            producer_claim=_handle_claim(execution),
         )
     else:
         started = runs_db.mark_ungated_tool_execution_started(
@@ -340,6 +467,7 @@ def record_execution_started(
             worker_token=execution.worker_token,
             claim_token=execution.claim_token,
             pre_tool_checkpoint_digest=execution.pre_tool_checkpoint_digest,
+            producer_claim=_handle_claim(execution),
         )
     if started is None:
         raise DurableToolJournalError("tool execution was fenced before worker start")
@@ -382,9 +510,19 @@ def record_execution_finished(
     controller_is_error: bool | None = None,
     completion_annotations: dict[str, Any] | None = None,
     post_controller_checkpoint: dict[str, Any] | None = None,
+    cancel_event: Any | None = None,
 ) -> dict[str, Any] | None:
     if execution is None or _CURRENT.get() is None:
         return None
+    # A Stop that lands while the controller is still running must not be
+    # overwritten by a completion receipt. The tool result stays unrecorded so
+    # the ambiguous/unknown outcome path owns it, rather than this call
+    # asserting a terminal state the user already cancelled.
+    if cancel_event is not None and cancel_event.is_set():
+        raise DurableToolJournalError(
+            "durable tool completion was cancelled before the receipt committed"
+        )
+    _require_current_producer(execution)
     if execution.authority_kind == "approved":
         finished = runs_db.finish_tool_execution(
             execution.run_id,
@@ -398,6 +536,7 @@ def record_execution_finished(
             controller_is_error=controller_is_error,
             completion_annotations=completion_annotations,
             post_controller_checkpoint=post_controller_checkpoint,
+            producer_claim=_handle_claim(execution),
         )
         if finished is None:
             raise DurableToolJournalError("tool completion receipt was fenced")
@@ -415,6 +554,7 @@ def record_execution_finished(
         completion_annotations=completion_annotations,
         post_controller_checkpoint=post_controller_checkpoint,
         pre_tool_checkpoint_digest=execution.pre_tool_checkpoint_digest,
+        producer_claim=_handle_claim(execution),
     )
     if finished is None:
         raise DurableToolJournalError("tool completion receipt was fenced")
@@ -482,7 +622,13 @@ def _restore_completion(decision: Any, controller: Any, stored: dict[str, Any]) 
     )
 
 
-def settle_controller_completion(result: Any, decision: Any, controller: Any) -> Any:
+def settle_controller_completion(
+    result: Any,
+    decision: Any,
+    controller: Any,
+    *,
+    cancel_event: Any | None = None,
+) -> Any:
     """Select once, commit once, and replay without re-running controller logic."""
 
     if not isinstance(result, PreparedDurableResult):
@@ -499,6 +645,7 @@ def settle_controller_completion(result: Any, decision: Any, controller: Any) ->
         controller_is_error=bool(completion.is_error),
         completion_annotations=dict(decision.provenance),
         post_controller_checkpoint=controller.export_state(),
+        cancel_event=cancel_event,
     )
     # The finisher returns the row it committed (including terminal replay).
     # Do not issue a second lookup: a lost response must be settled from the
@@ -646,7 +793,7 @@ def resume_checkpoint_calls(
             elif verdict not in {"deny"}:
                 slot = begin_tool_decision(session_id, approval_id)
                 verdict = wait_tool_decision(
-                    slot, approval_id, cancel_event=cancel_event
+                    slot, approval_id, cancel_event=cancel_event, fail_closed=True
                 )
         elif index == 0 and recovered_execution_id:
             # The original public tool_start is already in the durable event
@@ -682,7 +829,7 @@ def resume_checkpoint_calls(
             try:
                 if slot is not None:
                     verdict = wait_tool_decision(
-                        slot, approval_id, cancel_event=cancel_event
+                        slot, approval_id, cancel_event=cancel_event, fail_closed=True
                     )
                     slot = None
             finally:
