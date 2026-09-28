@@ -34,7 +34,7 @@ from pathlib import Path, PurePosixPath
 
 
 ROOT = Path(sys.argv[1])
-EXPECTED_VERSION = "3.0.0"
+EXPECTED_VERSION = "3.0.1"
 EXPECTED_PRODUCT = "Helix Harness v3"
 EXPECTED_BUNDLE_ID = "ai.helix.harness.v3"
 EXPECTED_SCHEME = "helixharness-v3"
@@ -176,5 +176,5 @@ export RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }$release_remap"
 exec npx --prefix . tauri build \
   --bundles app \
   --config src-tauri/tauri.helix-v3.conf.json \
-  --config '{"version":"3.0.0"}' \
+  --config '{"version":"3.0.1"}' \
   "$@"

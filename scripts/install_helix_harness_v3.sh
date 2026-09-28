@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 set -euo pipefail
 
-release_tag="v3.0.0"
-asset_name="Helix-Harness-v3.0.0-macos-arm64.zip"
+release_tag="v3.0.1"
+release_version="3.0.1"
+asset_name="Helix-Harness-v3.0.1-macos-arm64.zip"
 repository="SuperHelix77/Helix-Harness"
 install_root="${HELIX_INSTALL_DIR:-${HOME}/Applications}"
 target_app="$install_root/Helix Harness v3.app"
@@ -23,7 +24,7 @@ release_base="https://github.com/$repository/releases/download/$release_tag"
 archive="$task_tmp/$asset_name"
 checksums="$task_tmp/SHA256SUMS.txt"
 
-echo "Downloading Helix Harness v3…"
+  echo "Downloading Helix Harness v3 $release_version…"
 curl -fL --retry 3 --proto '=https' --tlsv1.2 \
   "$release_base/$asset_name" -o "$archive"
 curl -fL --retry 3 --proto '=https' --tlsv1.2 \
@@ -49,7 +50,7 @@ fi
 
 bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$source_app/Contents/Info.plist")"
 version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$source_app/Contents/Info.plist")"
-if [[ "$bundle_id" != "ai.helix.harness.v3" || "$version" != "3.0.0" ]]; then
+if [[ "$bundle_id" != "ai.helix.harness.v3" || "$version" != "$release_version" ]]; then
   echo "The verified archive has an unexpected application identity." >&2
   exit 1
 fi

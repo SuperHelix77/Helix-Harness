@@ -128,10 +128,10 @@ Adversarial test classes in the v2.1 baseline include: kill after side-effect bu
 ## Install (macOS, Apple Silicon)
 
 ```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/SuperHelix77/Helix-Harness/v3.0.0/scripts/install_helix_harness_v3.sh)"
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/SuperHelix77/Helix-Harness/v3.0.1/scripts/install_helix_harness_v3.sh)"
 ```
 
-The installer downloads the app and published checksum from the [v3.0.0 release page](https://github.com/SuperHelix77/Helix-Harness/releases/tag/v3.0.0), verifies the archive before extraction, and installs into `~/Applications`. It installs as **Helix Harness v3** with bundle ID `ai.helix.harness.v3`, so an existing v2 installation is left untouched. Set `HELIX_INSTALL_DIR` before running to choose another destination.
+The installer downloads the app and published checksum from the [v3.0.1 release page](https://github.com/SuperHelix77/Helix-Harness/releases/tag/v3.0.1), verifies the archive before extraction, and installs into `~/Applications`. It installs as **Helix Harness v3** with bundle ID `ai.helix.harness.v3`, so an existing v2 installation is left untouched. Set `HELIX_INSTALL_DIR` before running to choose another destination.
 
 The app is ad-hoc signed and not Apple-notarized. macOS will ask you to confirm first launch.
 
