@@ -24,7 +24,7 @@ release_base="https://github.com/$repository/releases/download/$release_tag"
 archive="$task_tmp/$asset_name"
 checksums="$task_tmp/SHA256SUMS.txt"
 
-  echo "Downloading Helix Harness v3 $release_version…"
+  echo "Downloading Helix Harness v3 '$release_version'…"
 curl -fL --retry 3 --proto '=https' --tlsv1.2 \
   "$release_base/$asset_name" -o "$archive"
 curl -fL --retry 3 --proto '=https' --tlsv1.2 \
