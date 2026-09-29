@@ -155,7 +155,6 @@ import {
 	CloudIcon,
 	CpuIcon,
 	CursorInfo02Icon,
-	DashboardCircleIcon,
 	Delete02Icon,
 	Download01Icon,
 	DownloadSquare01Icon,
@@ -2091,7 +2090,7 @@ export function AppSidebar() {
 			),
 		},
 		hub: {
-			icon: DashboardCircleIcon,
+			icon: Globe02Icon,
 			label: t("shell.navigation.hub"),
 			active: pathname === "/hub" || pathname.startsWith("/hub/"),
 			onClick: () => {
