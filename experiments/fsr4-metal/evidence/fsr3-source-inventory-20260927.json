@@ -1,0 +1,499 @@
+{
+  "declared_revision": "60f4ea81909200d8542eca14dccb2628b763a9a3",
+  "files": [
+    {
+      "bytes": 35352,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/ffx_fsr2.h",
+      "sha256": "3f9e6ca6fa6edc592a0ba65d374c4a0bfa3640da33d2ef27151df783f17394a5"
+    },
+    {
+      "bytes": 39982,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/ffx_fsr3upscaler.h",
+      "sha256": "10218982d65986079c13d84f6ca3bfc9fbbb1742f24a94e0afa83ed225510e95"
+    },
+    {
+      "bytes": 2010,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/ffx_provider_fsr2.h",
+      "sha256": "393a73baed107d78bf943d65f5ff154c595c312a4e07001ad66e9f19594fd996"
+    },
+    {
+      "bytes": 2038,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/ffx_provider_fsr3upscale.h",
+      "sha256": "05def3a4e55afea9e015ef334172984ada31be0d9100aa2d1d721ac8fa6e9f7b"
+    },
+    {
+      "bytes": 9178,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/ffx_spd.h",
+      "sha256": "6364e6d314f39492b22f9bb4e8621eb08aab0bda462855c3f97a055fa8703f35"
+    },
+    {
+      "bytes": 67011,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr1/ffx_fsr1.h",
+      "sha256": "328ee880b26f400f7d8e59ffcdf55b83ae71d6de759e72f106a3c8cfc0d4cc8e"
+    },
+    {
+      "bytes": 13078,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr2/ffx_fsr2_accumulate.h",
+      "sha256": "e3a2ce1acde014e9862d83183b83ee7982acde8040b6924f227de2e8999bccf5"
+    },
+    {
+      "bytes": 32898,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr2/ffx_fsr2_callbacks_hlsl.h",
+      "sha256": "3deadbe185ec3ffa92f7fab0dfb2a4dd1449c4bf1605da8213ca7dd5e870abc0"
+    },
+    {
+      "bytes": 19688,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr2/ffx_fsr2_common.h",
+      "sha256": "86a89fe500b9a34747355c33fd6844b3b150ceceb255034e56fc9e30d0769dbb"
+    },
+    {
+      "bytes": 5409,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr2/ffx_fsr2_compute_luminance_pyramid.h",
+      "sha256": "824cd60381583553741c7fa22c169435b75a516d65a4e84580bc09836fc2bcdd"
+    },
+    {
+      "bytes": 11378,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr2/ffx_fsr2_depth_clip.h",
+      "sha256": "867f006e448c7df17584175421998d9645c74443f6de6ea39ad9ee0af6b9c66c"
+    },
+    {
+      "bytes": 3687,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr2/ffx_fsr2_lock.h",
+      "sha256": "c0803b8d016a2a022d0dd9febef6229bb3aa7ea07e9ea3006430b8dc53eb86d7"
+    },
+    {
+      "bytes": 4672,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr2/ffx_fsr2_postprocess_lock_status.h",
+      "sha256": "38115ec9e04fdfa50645fee8cb2b32474056d4f15940f76c72774572a08fac39"
+    },
+    {
+      "bytes": 3673,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr2/ffx_fsr2_rcas.h",
+      "sha256": "a52c5d78bea88eab83b738947353c60cdedc2b89084207e8c50e3c6ee7d4e41d"
+    },
+    {
+      "bytes": 5476,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr2/ffx_fsr2_reconstruct_dilated_velocity_and_previous_depth.h",
+      "sha256": "beae6f13448aeaa3546d2412a0851c98cf35818ea22bb0c1200be5465366e6a8"
+    },
+    {
+      "bytes": 5348,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr2/ffx_fsr2_reproject.h",
+      "sha256": "4bb0db1838bcdfcccce6614aeddbb6806698392c454d1874517576b243f398a4"
+    },
+    {
+      "bytes": 7863,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr2/ffx_fsr2_resources.h",
+      "sha256": "7f3889688ed223311230d76f5644ce1bc8e7d9e0528c861c8292856e39725aae"
+    },
+    {
+      "bytes": 29212,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr2/ffx_fsr2_sample.h",
+      "sha256": "834d0fdd7af38d2dc4df4bd17edfecef078398514a16868d421894f4565047d8"
+    },
+    {
+      "bytes": 10718,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr2/ffx_fsr2_tcr_autogen.h",
+      "sha256": "3c3121c482908e0e925c1ab246815fe823902f8170f5347a6915f6a6b02d21a5"
+    },
+    {
+      "bytes": 21098,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr2/ffx_fsr2_upsample.h",
+      "sha256": "ecef3f821918328efa8c28fdef756f612578ed0416661f29cdf88adfe979453d"
+    },
+    {
+      "bytes": 1253,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr3/ffx_fsr3_callbacks_hlsl.h",
+      "sha256": "846236a94604b0a86277b37209c494854ef2f537da06688bfd6756c071c61aa9"
+    },
+    {
+      "bytes": 1329,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr3/ffx_fsr3_common.h",
+      "sha256": "fd7363bc5ac020f923837db7f191bd57c7a67f6b5bf61b774d28543d6854b61d"
+    },
+    {
+      "bytes": 2996,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr3/ffx_fsr3_resources.h",
+      "sha256": "a4ba8c087b5afd97691e2f276102a6c6667c377962de78c9f4a02286e04830b1"
+    },
+    {
+      "bytes": 8766,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr3upscaler/ffx_fsr3upscaler_accumulate.h",
+      "sha256": "d3d47fbf9c83bddbeb6f0d0f05f648b739a7edfaee287ea38fb18bf53ed478a3"
+    },
+    {
+      "bytes": 29538,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr3upscaler/ffx_fsr3upscaler_callbacks_hlsl.h",
+      "sha256": "61bf134d78b72ab81a7e39ce9481d73027f91941137bb6d69e4354830b476901"
+    },
+    {
+      "bytes": 13353,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr3upscaler/ffx_fsr3upscaler_common.h",
+      "sha256": "b4ee5b5dbf10df0e81d704cfff92507231fb3e3b93f06b9bfa8490f316e7bb66"
+    },
+    {
+      "bytes": 5729,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr3upscaler/ffx_fsr3upscaler_debug_view.h",
+      "sha256": "ba26bd4a2edb46853b7206a32f744fe0f28529264cf0fb7dbabfcb5242f8fd3e"
+    },
+    {
+      "bytes": 5322,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr3upscaler/ffx_fsr3upscaler_luma_instability.h",
+      "sha256": "ea921c3af883fa5ef20d214749b269d793668ea916d97a749dd86c3320ad1d46"
+    },
+    {
+      "bytes": 6188,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr3upscaler/ffx_fsr3upscaler_luma_pyramid.h",
+      "sha256": "3f3362c5115688ad5a868c497c4ce45d0e0019cac51dac277e2f918dac76c242"
+    },
+    {
+      "bytes": 5840,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr3upscaler/ffx_fsr3upscaler_prepare_inputs.h",
+      "sha256": "12e14745f8da1df56546873726c6f5ea10e26a944ebaff982fa10f18084280bb"
+    },
+    {
+      "bytes": 12463,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr3upscaler/ffx_fsr3upscaler_prepare_reactivity.h",
+      "sha256": "1346c7dd03c39430bcac4e482fb4a33b3e45af76ecfb214cd61b833b036c59ee"
+    },
+    {
+      "bytes": 3800,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr3upscaler/ffx_fsr3upscaler_rcas.h",
+      "sha256": "7942c22fdaafaaf7648c20877104160e76d3fa2ab810a7f763e906bf7e3c36ba"
+    },
+    {
+      "bytes": 3253,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr3upscaler/ffx_fsr3upscaler_reproject.h",
+      "sha256": "bca57070feb074ecb352c15f7588a2b7d1c00690ca221bf8d35f51badf94baae"
+    },
+    {
+      "bytes": 7638,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr3upscaler/ffx_fsr3upscaler_resources.h",
+      "sha256": "4190a25578ed28f56a83b1ed3c1cbd239cf73b622ff4819b8e8fc89e3eade433"
+    },
+    {
+      "bytes": 28000,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr3upscaler/ffx_fsr3upscaler_sample.h",
+      "sha256": "4446848fedae924d28235839c5d2884c3daaa9f02d34f64912a96b670d285f03"
+    },
+    {
+      "bytes": 2708,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr3upscaler/ffx_fsr3upscaler_shading_change.h",
+      "sha256": "09097c77256ce5a0a43c286eb3d6e2a5568be7905d9b7374058135df18c2210e"
+    },
+    {
+      "bytes": 9467,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr3upscaler/ffx_fsr3upscaler_shading_change_pyramid.h",
+      "sha256": "69c7d21737ff16affe10fe27053b762debe535f304a451832dc20beadfe56301"
+    },
+    {
+      "bytes": 28487,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/fsr3upscaler/ffx_fsr3upscaler_upsample.h",
+      "sha256": "ccff9b22f7051b864d46d1d11a8efd0a0b8dd96d0cb2b94515e61df579deaf60"
+    },
+    {
+      "bytes": 42614,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "include/gpu/spd/ffx_spd.h",
+      "sha256": "4d3b02d58b215f7d0d3fcdc4cabfa8f2cd03a8efdde12f770c2142b1ccc81033"
+    },
+    {
+      "bytes": 90692,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/ffx_fsr2.cpp",
+      "sha256": "0074122399ed4f43a1a572b6834fd3d49598afb887715a59d47d4c29f406b77b"
+    },
+    {
+      "bytes": 3247,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/ffx_fsr2_maximum_bias.h",
+      "sha256": "f3f754b68e26ddde993e490c89cd433fb72274b0223c88e12a253feba060744b"
+    },
+    {
+      "bytes": 5282,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/ffx_fsr2_private.h",
+      "sha256": "ae4b50bc37160490f643d405be9e768f9e2e409cc5fa4ecc30d18448eb48c26f"
+    },
+    {
+      "bytes": 16746,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/ffx_fsr2_shaderblobs.cpp",
+      "sha256": "4a26fd1120f152dd1173d4e019c3c66e9b865924aa84863ec9ca2936901a7d5c"
+    },
+    {
+      "bytes": 1708,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/ffx_fsr2_shaderblobs.h",
+      "sha256": "d35657e2375ea3cb68443653ab0a8e641e7ca1da248e6419d0558568f0e792e4"
+    },
+    {
+      "bytes": 3450,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/ffx_fsr3_private.h",
+      "sha256": "fe9014617e146b1eb224a6602ef2676c8537b73f04a5bdc47d01ec0b12cfce8f"
+    },
+    {
+      "bytes": 98782,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/ffx_fsr3upscaler.cpp",
+      "sha256": "0fd97a1016043cf3ec1b50c2112fc16f6f8702930ed54a166649a1d956a41e1a"
+    },
+    {
+      "bytes": 6578,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/ffx_fsr3upscaler_private.h",
+      "sha256": "807f07590e7aa9a3969f0c3125cce16b1dc7b8d6bc92dd81ec3539dee9c10fc1"
+    },
+    {
+      "bytes": 19383,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/ffx_fsr3upscaler_shaderblobs.cpp",
+      "sha256": "428fba6812d7ba4ae7240c8d84250040604548f0272b3f77de7226f219c468ee"
+    },
+    {
+      "bytes": 1740,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/ffx_fsr3upscaler_shaderblobs.h",
+      "sha256": "403a2d855ada4df51f1890235731971a457032010054df3b081a932143736788"
+    },
+    {
+      "bytes": 14445,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/ffx_provider_fsr2.cpp",
+      "sha256": "7d878685169946962c607cc0abb1eba833a6b2da650c77610e2630e03696d4d3"
+    },
+    {
+      "bytes": 19910,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/ffx_provider_fsr3upscale.cpp",
+      "sha256": "0572529154e534849823d86a7792f179deec89ef283c341b5917d696a69d2fde"
+    },
+    {
+      "bytes": 4455,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/shaders/ffx_fsr2_accumulate_pass.hlsl",
+      "sha256": "32f8b86ae333c47939f69b304f18df663c6d0d5ea1ad5b011e7b747f4f610107"
+    },
+    {
+      "bytes": 3575,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/shaders/ffx_fsr2_autogen_reactive_pass.hlsl",
+      "sha256": "f642696bac5bd26f48625cd0306bf10e24879882dba60ece8cb73cf354321d30"
+    },
+    {
+      "bytes": 2549,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/shaders/ffx_fsr2_compute_luminance_pyramid_pass.hlsl",
+      "sha256": "5c2e9ec423dd58f79c12685c0b6417732f94c3156bec8f83324616b323fb523e"
+    },
+    {
+      "bytes": 2523,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/shaders/ffx_fsr2_debug_blit.hlsl",
+      "sha256": "53f86d43e14a93baf54c376503de52bfbcabe80f78057326a50c12a6386e1ec9"
+    },
+    {
+      "bytes": 3047,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/shaders/ffx_fsr2_depth_clip_pass.hlsl",
+      "sha256": "d4773a63f3154163ada81aaff474a1af1e72e295d88408d7cccd09c8f8c81668"
+    },
+    {
+      "bytes": 2516,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/shaders/ffx_fsr2_lock_pass.hlsl",
+      "sha256": "099f869bd924c47533a2cd9c56431a8c036356a52329d149c3413e0740527f97"
+    },
+    {
+      "bytes": 2640,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/shaders/ffx_fsr2_rcas_pass.hlsl",
+      "sha256": "8416e21568482efb7d8622850e0476bf95cebc03da717eb508ef5caa091ef0dc"
+    },
+    {
+      "bytes": 2848,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/shaders/ffx_fsr2_reconstruct_previous_depth_pass.hlsl",
+      "sha256": "c118f5f68598a8cebd94ec3ff0e270424293dde57c21db11a6fec164d17f56bc"
+    },
+    {
+      "bytes": 4534,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/shaders/ffx_fsr2_tcr_autogen_pass.hlsl",
+      "sha256": "6bc33cc261edba011347ef8417dc9f670a7d99981ef2eee4b7d89b03c15f02ee"
+    },
+    {
+      "bytes": 5109,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/shaders/ffx_fsr3upscaler_accumulate_pass.hlsl",
+      "sha256": "a9970dd929cda29a15acf1546a999db2ad2c49d8bf5a58a93797db09cbaf4fb1"
+    },
+    {
+      "bytes": 3807,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/shaders/ffx_fsr3upscaler_autogen_reactive_pass.hlsl",
+      "sha256": "aca5c8f4ea09bd799a907319b4f8b57db254f085a48a3968e83d0e3f548bf199"
+    },
+    {
+      "bytes": 2746,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/shaders/ffx_fsr3upscaler_debug_view_pass.hlsl",
+      "sha256": "caced71013be1806fb595b619bc7221a07cc057e395d9a866beeba744c8d57ac"
+    },
+    {
+      "bytes": 2976,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/shaders/ffx_fsr3upscaler_luma_instability_pass.hlsl",
+      "sha256": "5f2d50ea07bc46d9d27adc508ab013c6dc5137d4be67626ffaf4ef2593f5698a"
+    },
+    {
+      "bytes": 3072,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/shaders/ffx_fsr3upscaler_luma_pyramid_pass.hlsl",
+      "sha256": "3d5be83c9d7ec601af52708788a8fc991c529a2e29fe4e340dc4b840a7154bc4"
+    },
+    {
+      "bytes": 2946,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/shaders/ffx_fsr3upscaler_prepare_inputs_pass.hlsl",
+      "sha256": "5312aed3cb16d0d639b33b9d36476d253e58342df2d7d2030ba5690a982f40d6"
+    },
+    {
+      "bytes": 3302,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/shaders/ffx_fsr3upscaler_prepare_reactivity_pass.hlsl",
+      "sha256": "27b2f4ee4aca425d4e7b60925e80a4aae7057781044d08db4cacae3d183565d3"
+    },
+    {
+      "bytes": 2795,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/shaders/ffx_fsr3upscaler_rcas_pass.hlsl",
+      "sha256": "699fb6c19ceb57ebdffaedb2c50d9b1a6d4e9990ddd383056e70346aa484079d"
+    },
+    {
+      "bytes": 2490,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/shaders/ffx_fsr3upscaler_shading_change_pass.hlsl",
+      "sha256": "30ae2b27d3a3fc520510be169e50a1a5ec937b505ee0a169fa82293e81c0e0eb"
+    },
+    {
+      "bytes": 3169,
+      "lexical_tokens": {},
+      "license_candidate": false,
+      "path": "internal/shaders/ffx_fsr3upscaler_shading_change_pyramid_pass.hlsl",
+      "sha256": "76b0e8fb9b9ead2516db1efb4239116c2ca0973c1c589d86f25a5adc6f8c17e4"
+    }
+  ],
+  "license_review": "not_cleared",
+  "model_graph_recovered": false,
+  "revision_verified_against_upstream": false,
+  "schema": "helix.fsr-metal.source-inventory.v1"
+}

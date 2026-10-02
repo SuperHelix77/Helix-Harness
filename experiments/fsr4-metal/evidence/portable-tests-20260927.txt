@@ -1,0 +1,107 @@
+test_branch_not_accepted_as_revision (test_audit.AuditTests.test_branch_not_accepted_as_revision) ... ok
+test_empty_tree_rejected (test_audit.AuditTests.test_empty_tree_rejected) ... ok
+test_hash_and_lexical_scan_not_clearance (test_audit.AuditTests.test_hash_and_lexical_scan_not_clearance) ... ok
+test_symlink_rejected (test_audit.AuditTests.test_symlink_rejected) ... ok
+test_aliasing (test_contract.ContractTests.test_aliasing) ... ok
+test_bare_attestations_do_not_prove_a_bridge (test_contract.ContractTests.test_bare_attestations_do_not_prove_a_bridge) ... ok
+test_colorspace_motion_and_jitter (test_contract.ContractTests.test_colorspace_motion_and_jitter) ... ok
+test_cross_device (test_contract.ContractTests.test_cross_device) ... ok
+test_crossover_fails_closed (test_contract.ContractTests.test_crossover_fails_closed) ... ok
+test_failure_requires_reset (test_contract.ContractTests.test_failure_requires_reset) ... ok
+test_first_frame_requires_reset (test_contract.ContractTests.test_first_frame_requires_reset) ... ok
+test_gap_resize_and_convention_change (test_contract.ContractTests.test_gap_resize_and_convention_change) ... ok
+test_invalid_extent_and_format (test_contract.ContractTests.test_invalid_extent_and_format) ... ok
+test_invalid_input_does_not_consume_history (test_contract.ContractTests.test_invalid_input_does_not_consume_history) ... ok
+test_microbenchmark_never_promotes (test_contract.ContractTests.test_microbenchmark_never_promotes) ... ok
+test_motion_at_display (test_contract.ContractTests.test_motion_at_display) ... ok
+test_native_metadata (test_contract.ContractTests.test_native_metadata) ... ok
+test_nonfinite_and_zero (test_contract.ContractTests.test_nonfinite_and_zero) ... ok
+test_pending_and_stale_completion (test_contract.ContractTests.test_pending_and_stale_completion) ... ok
+test_successful_sequence (test_contract.ContractTests.test_successful_sequence) ... ok
+test_symmetric_and_clamped (test_fsr3metal.LanczosPolynomial.test_symmetric_and_clamped) ... ok
+test_tracks_true_lanczos2 (test_fsr3metal.LanczosPolynomial.test_tracks_true_lanczos2) ... ok
+test_unity_at_origin_and_support_edges (test_fsr3metal.LanczosPolynomial.test_unity_at_origin_and_support_edges) ... ok
+test_lanczos_beats_bilinear_by_a_real_margin (test_fsr3metal.MetricIsWellPosed.test_lanczos_beats_bilinear_by_a_real_margin)
+Not just 'better', but better than the run-to-run precision of the ... ok
+test_receipts_declare_the_fixture_is_band_limited (test_fsr3metal.MetricIsWellPosed.test_receipts_declare_the_fixture_is_band_limited) ... ok
+test_variants_beat_the_memoryless_floor (test_fsr3metal.MetricIsWellPosed.test_variants_beat_the_memoryless_floor)
+Every memoryless filter must beat the downsampled input itself. ... ok
+test_accum_pixel_has_no_duplicate_pixels (test_fsr3metal.PerPixelBandwidth.test_accum_pixel_has_no_duplicate_pixels) ... ok
+test_kernel_takes_frame_constants_from_uniforms (test_fsr3metal.PerPixelBandwidth.test_kernel_takes_frame_constants_from_uniforms) ... ok
+test_per_pixel_struct_is_small_enough (test_fsr3metal.PerPixelBandwidth.test_per_pixel_struct_is_small_enough) ... ok
+test_ghosting_metric_has_discriminating_power (test_fsr3metal.ReceiptHonesty.test_ghosting_metric_has_discriminating_power)
+A ghosting metric that cannot fail is not a test. ... ok
+test_lanczos_beats_bilinear (test_fsr3metal.ReceiptHonesty.test_lanczos_beats_bilinear) ... ok
+test_no_competitive_claims (test_fsr3metal.ReceiptHonesty.test_no_competitive_claims) ... ok
+test_pipeline_is_at_background_level (test_fsr3metal.ReceiptHonesty.test_pipeline_is_at_background_level)
+A reprojecting pipeline must leave no visible trail. ... ok
+test_receipts_exist (test_fsr3metal.ReceiptHonesty.test_receipts_exist) ... ok
+test_kernels_reference_provenance (test_fsr3metal.SourceIntegrity.test_kernels_reference_provenance) ... ok
+test_no_amd_binaries_vendored (test_fsr3metal.SourceIntegrity.test_no_amd_binaries_vendored)
+The FSR4 DLL must never enter the repository. ... ok
+test_corrects_the_shader_label_misreading (test_fsr4_extraction.BinaryInventory.test_corrects_the_shader_label_misreading)
+The fsr4_model_v07_* strings are DXBC/DXIL labels, not weights. ... ok
+test_dxbc_shader_containers_dominate_rdata (test_fsr4_extraction.BinaryInventory.test_dxbc_shader_containers_dominate_rdata) ... ok
+test_identifies_the_vendor_product (test_fsr4_extraction.BinaryInventory.test_identifies_the_vendor_product) ... ok
+test_records_that_the_binary_was_never_executed (test_fsr4_extraction.BinaryInventory.test_records_that_the_binary_was_never_executed) ... ok
+test_layer_count_and_contiguity (test_fsr4_extraction.Graph.test_layer_count_and_contiguity) ... ok
+test_layer_names_match_layers_times_resolutions (test_fsr4_extraction.Graph.test_layer_names_match_layers_times_resolutions) ... ok
+test_same_binary_across_all_reports (test_fsr4_extraction.Graph.test_same_binary_across_all_reports) ... ok
+test_shapes_are_still_declared_unknown (test_fsr4_extraction.Graph.test_shapes_are_still_declared_unknown) ... ok
+test_manifest_looks_like_a_conv_net (test_fsr4_extraction.Manifest.test_manifest_looks_like_a_conv_net) ... ok
+test_multiple_tables_reported_not_hidden (test_fsr4_extraction.Manifest.test_multiple_tables_reported_not_hidden) ... ok
+test_shape_is_never_claimed (test_fsr4_extraction.Manifest.test_shape_is_never_claimed) ... ok
+test_extraction_tools_do_not_write_weights (test_fsr4_extraction.NothingVendored.test_extraction_tools_do_not_write_weights) ... ok
+test_no_dll_and_no_large_blobs_in_the_repo (test_fsr4_extraction.NothingVendored.test_no_dll_and_no_large_blobs_in_the_repo) ... ok
+test_decodes_module_block_id (test_llvm_bitstream.BitstreamBasics.test_decodes_module_block_id) ... ok
+test_reads_abbrev_width (test_llvm_bitstream.BitstreamBasics.test_reads_abbrev_width) ... ok
+test_rejects_non_bitstream (test_llvm_bitstream.BitstreamBasics.test_rejects_non_bitstream) ... ok
+test_width_is_not_base128 (test_llvm_bitstream.BitstreamBasics.test_width_is_not_base128)
+A 2-bit-width stream is a different encoding from base-128. ... ok
+test_large_value_roundtrips (test_llvm_bitstream.VBRWidthSemantics.test_large_value_roundtrips) ... ok
+test_multibyte_value_roundtrips (test_llvm_bitstream.VBRWidthSemantics.test_multibyte_value_roundtrips) ... ok
+test_every_half_bit_round_trips_through_float (test_precision_arena.HalfRoundTrip.test_every_half_bit_round_trips_through_float) ... ok
+test_exact_small_values (test_precision_arena.HalfRoundTrip.test_exact_small_values) ... ok
+test_negative_zero_preserved (test_precision_arena.HalfRoundTrip.test_negative_zero_preserved) ... ok
+test_overshoot_saturates_to_inf (test_precision_arena.HalfRoundTrip.test_overshoot_saturates_to_inf) ... ok
+test_subnormal_bits_flush_rather_than_round (test_precision_arena.HalfRoundTrip.test_subnormal_bits_flush_rather_than_round) ... ok
+test_subnormals_flush_to_zero (test_precision_arena.HalfRoundTrip.test_subnormals_flush_to_zero) ... ok
+test_subnormal_band_is_flat (test_precision_arena.HalfULP.test_subnormal_band_is_flat) ... ok
+test_ulp_halves_with_each_binade (test_precision_arena.HalfULP.test_ulp_halves_with_each_binade) ... ok
+test_receipts_declare_their_limits (test_precision_arena.ReceiptHonesty.test_receipts_declare_their_limits) ... ok
+test_receipts_do_not_promote_absolute_timings (test_precision_arena.ReceiptHonesty.test_receipts_do_not_promote_absolute_timings)
+The receipt must not present absolute ms as a stable result. ... ok
+test_receipts_record_distribution_not_just_a_median (test_precision_arena.ReceiptHonesty.test_receipts_record_distribution_not_just_a_median)
+A bare median hides this host's two-clock-state bimodality. ... ok
+test_row_major_reconstruction (test_precision_arena.SimdgroupOrientationContract.test_row_major_reconstruction) ... ok
+test_untransposed_weights_shift_by_one_column (test_precision_arena.SimdgroupOrientationContract.test_untransposed_weights_shift_by_one_column) ... ok
+test_all_reset_sequence_cannot_claim_temporal_coverage (test_sequence_quality.SequenceTests.test_all_reset_sequence_cannot_claim_temporal_coverage) ... ok
+test_bad_tolerance_policy (test_sequence_quality.SequenceTests.test_bad_tolerance_policy) ... ok
+test_capture_identity_and_population (test_sequence_quality.SequenceTests.test_capture_identity_and_population) ... ok
+test_empty_temporal_coverage_rejected (test_sequence_quality.SequenceTests.test_empty_temporal_coverage_rejected) ... ok
+test_exact_sequence_is_not_production_approval (test_sequence_quality.SequenceTests.test_exact_sequence_is_not_production_approval) ... ok
+test_input_scale_cannot_be_secretly_raised (test_sequence_quality.SequenceTests.test_input_scale_cannot_be_secretly_raised) ... ok
+test_missing_stress_region_rejected (test_sequence_quality.SequenceTests.test_missing_stress_region_rejected) ... ok
+test_nonfinite_wrong_shape_or_missing_frame (test_sequence_quality.SequenceTests.test_nonfinite_wrong_shape_or_missing_frame) ... ok
+test_rare_bad_pixel_not_hidden_by_mean (test_sequence_quality.SequenceTests.test_rare_bad_pixel_not_hidden_by_mean) ... ok
+test_reset_cannot_use_history (test_sequence_quality.SequenceTests.test_reset_cannot_use_history) ... ok
+test_scene_disjointness (test_sequence_quality.SequenceTests.test_scene_disjointness) ... ok
+test_temporal_flicker_detected_at_equal_spatial_error (test_sequence_quality.SequenceTests.test_temporal_flicker_detected_at_equal_spatial_error) ... ok
+test_ultra_performance_fixed_three_x (test_sequence_quality.SequenceTests.test_ultra_performance_fixed_three_x) ... ok
+test_checksum_corruption (test_weight_codec.WeightCodecTests.test_checksum_corruption) ... ok
+test_deterministic (test_weight_codec.WeightCodecTests.test_deterministic) ... ok
+test_empty_and_wrong_type (test_weight_codec.WeightCodecTests.test_empty_and_wrong_type) ... ok
+test_every_int8_value_and_raw_fallback (test_weight_codec.WeightCodecTests.test_every_int8_value_and_raw_fallback) ... ok
+test_every_signed_nibble_and_tails (test_weight_codec.WeightCodecTests.test_every_signed_nibble_and_tails) ... ok
+test_exact_extreme_exceptions (test_weight_codec.WeightCodecTests.test_exact_extreme_exceptions) ... ok
+test_illegal_tail_mask (test_weight_codec.WeightCodecTests.test_illegal_tail_mask) ... ok
+test_invalid_header (test_weight_codec.WeightCodecTests.test_invalid_header) ... ok
+test_ledger_rejects_unrelated_raw (test_weight_codec.WeightCodecTests.test_ledger_rejects_unrelated_raw) ... ok
+test_nonzero_tail_nibble (test_weight_codec.WeightCodecTests.test_nonzero_tail_nibble) ... ok
+test_random_roundtrip (test_weight_codec.WeightCodecTests.test_random_roundtrip) ... ok
+test_truncation_and_extra_data (test_weight_codec.WeightCodecTests.test_truncation_and_extra_data) ... ok
+
+----------------------------------------------------------------------
+Ran 93 tests in 0.052s
+
+OK

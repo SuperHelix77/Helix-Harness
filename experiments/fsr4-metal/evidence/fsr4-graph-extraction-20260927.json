@@ -1,0 +1,2339 @@
+{
+  "NOT_established": [
+    "tensor shapes: the DXIL program signature carries register names and bindings, not internal convolution dimensions. Shapes require DXIL instruction-level dataflow and are NOT guessed here.",
+    "weight-to-layer mapping: the tensor size table cannot be matched to a layer without shapes, so no such mapping is claimed.",
+    "which tensors are FP8 versus INT8 within a layer"
+  ],
+  "dxil_containers": 2588,
+  "established": {
+    "graph": {
+      "4k": {
+        "contiguous": true,
+        "index_max": 190,
+        "index_min": 0,
+        "layer_count": 191,
+        "missing_indices": [],
+        "order": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34,
+          35,
+          36,
+          37,
+          38,
+          39,
+          40,
+          41,
+          42,
+          43,
+          44,
+          45,
+          46,
+          47,
+          48,
+          49,
+          50,
+          51,
+          52,
+          53,
+          54,
+          55,
+          56,
+          57,
+          58,
+          59,
+          60,
+          61,
+          62,
+          63,
+          64,
+          65,
+          66,
+          67,
+          68,
+          69,
+          70,
+          71,
+          72,
+          73,
+          74,
+          75,
+          76,
+          77,
+          78,
+          79,
+          80,
+          81,
+          82,
+          83,
+          84,
+          85,
+          86,
+          87,
+          88,
+          89,
+          90,
+          91,
+          92,
+          93,
+          94,
+          95,
+          96,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          107,
+          108,
+          109,
+          110,
+          111,
+          112,
+          113,
+          114,
+          115,
+          116,
+          117,
+          118,
+          119,
+          120,
+          121,
+          122,
+          123,
+          124,
+          125,
+          126,
+          127,
+          128,
+          129,
+          130,
+          131,
+          132,
+          133,
+          134,
+          135,
+          136,
+          137,
+          138,
+          139,
+          140,
+          141,
+          142,
+          143,
+          144,
+          145,
+          146,
+          147,
+          148,
+          149,
+          150,
+          151,
+          152,
+          153,
+          154,
+          155,
+          156,
+          157,
+          158,
+          159,
+          160,
+          161,
+          162,
+          163,
+          164,
+          165,
+          166,
+          167,
+          168,
+          169,
+          170,
+          171,
+          172,
+          173,
+          174,
+          175,
+          176,
+          177,
+          178,
+          179,
+          180,
+          181,
+          182,
+          183,
+          184,
+          185,
+          186,
+          187,
+          188,
+          189,
+          190
+        ]
+      },
+      "8k": {
+        "contiguous": true,
+        "index_max": 190,
+        "index_min": 0,
+        "layer_count": 191,
+        "missing_indices": [],
+        "order": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34,
+          35,
+          36,
+          37,
+          38,
+          39,
+          40,
+          41,
+          42,
+          43,
+          44,
+          45,
+          46,
+          47,
+          48,
+          49,
+          50,
+          51,
+          52,
+          53,
+          54,
+          55,
+          56,
+          57,
+          58,
+          59,
+          60,
+          61,
+          62,
+          63,
+          64,
+          65,
+          66,
+          67,
+          68,
+          69,
+          70,
+          71,
+          72,
+          73,
+          74,
+          75,
+          76,
+          77,
+          78,
+          79,
+          80,
+          81,
+          82,
+          83,
+          84,
+          85,
+          86,
+          87,
+          88,
+          89,
+          90,
+          91,
+          92,
+          93,
+          94,
+          95,
+          96,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          107,
+          108,
+          109,
+          110,
+          111,
+          112,
+          113,
+          114,
+          115,
+          116,
+          117,
+          118,
+          119,
+          120,
+          121,
+          122,
+          123,
+          124,
+          125,
+          126,
+          127,
+          128,
+          129,
+          130,
+          131,
+          132,
+          133,
+          134,
+          135,
+          136,
+          137,
+          138,
+          139,
+          140,
+          141,
+          142,
+          143,
+          144,
+          145,
+          146,
+          147,
+          148,
+          149,
+          150,
+          151,
+          152,
+          153,
+          154,
+          155,
+          156,
+          157,
+          158,
+          159,
+          160,
+          161,
+          162,
+          163,
+          164,
+          165,
+          166,
+          167,
+          168,
+          169,
+          170,
+          171,
+          172,
+          173,
+          174,
+          175,
+          176,
+          177,
+          178,
+          179,
+          180,
+          181,
+          182,
+          183,
+          184,
+          185,
+          186,
+          187,
+          188,
+          189,
+          190
+        ]
+      }
+    },
+    "layers_with_named_bindings": 382,
+    "resolutions": [
+      "4k",
+      "8k"
+    ]
+  },
+  "evidence_class": "REAL_ARTIFACT_STATIC",
+  "licensing_note": "Static structure read of a user-supplied binary. No weight bytes are written to disk and the binary is not vendored. AMD's licence grants no reimplementation rights; that risk was accepted by the project owner.",
+  "per_layer_bindings": {
+    "mlfi_4k_pass0": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass1": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass10": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass100": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass101": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass102": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass103": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass104": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass105": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass106": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass107": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass108": [
+      "DXIL",
+      "PSV0",
+      "STATp"
+    ],
+    "mlfi_4k_pass109": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass11": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass110": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass111": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass112": [
+      "DXIL",
+      "PSV0",
+      "STATl"
+    ],
+    "mlfi_4k_pass113": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass114": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass115": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass116": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass117": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass118": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass119": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass12": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass120": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass121": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass122": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass123": [
+      "DXIL",
+      "PSV0t",
+      "STAT"
+    ],
+    "mlfi_4k_pass124": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass125": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass126": [
+      "DXIL",
+      "PSV0t",
+      "STAT"
+    ],
+    "mlfi_4k_pass127": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass128": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass129": [
+      "DXIL",
+      "PSV0t",
+      "STAT"
+    ],
+    "mlfi_4k_pass13": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass130": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass131": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass132": [
+      "DXIL",
+      "PSV0t",
+      "STAT"
+    ],
+    "mlfi_4k_pass133": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass134": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass135": [
+      "DXIL",
+      "PSV0t",
+      "STAT"
+    ],
+    "mlfi_4k_pass136": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass137": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass138": [
+      "DXIL",
+      "PSV0t",
+      "STAT"
+    ],
+    "mlfi_4k_pass139": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass14": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass140": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass141": [
+      "DXIL",
+      "PSV0t",
+      "STAT"
+    ],
+    "mlfi_4k_pass142": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass143": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass144": [
+      "DXIL",
+      "PSV0t",
+      "STAT"
+    ],
+    "mlfi_4k_pass145": [
+      "DXIL",
+      "PSV0",
+      "STATp"
+    ],
+    "mlfi_4k_pass146": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass147": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass148": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass149": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass15": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass150": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass151": [
+      "DXIL",
+      "PSV0",
+      "STATl"
+    ],
+    "mlfi_4k_pass152": [
+      "DXIL",
+      "PSV0L",
+      "STAT"
+    ],
+    "mlfi_4k_pass153": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass154": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass155": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass156": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass157": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass158": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass159": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass16": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass160": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass161": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass162": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass163": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass164": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass165": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass166": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass167": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass168": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass169": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass17": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass170": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass171": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass172": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass173": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass174": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass175": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass176": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass177": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass178": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass179": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass18": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass180": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass181": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass182": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass183": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass184": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass185": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass186": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass187": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass188": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass189": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass19": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass190": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass2": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass20": [
+      "DXIL",
+      "PSV0",
+      "STATl"
+    ],
+    "mlfi_4k_pass21": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass22": [
+      "DXIL",
+      "PSV0",
+      "STATp"
+    ],
+    "mlfi_4k_pass23": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass24": [
+      "DXIL",
+      "PSV0",
+      "STATl"
+    ],
+    "mlfi_4k_pass25": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass26": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass27": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass28": [
+      "DXIL",
+      "PSV0p",
+      "STAT"
+    ],
+    "mlfi_4k_pass29": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass3": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass30": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass31": [
+      "DXIL",
+      "PSV0p",
+      "STAT"
+    ],
+    "mlfi_4k_pass32": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass33": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass34": [
+      "DXIL",
+      "PSV0p",
+      "STAT"
+    ],
+    "mlfi_4k_pass35": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass36": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass37": [
+      "DXIL",
+      "PSV0p",
+      "STAT"
+    ],
+    "mlfi_4k_pass38": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass39": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass4": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass40": [
+      "DXIL",
+      "PSV0p",
+      "STAT"
+    ],
+    "mlfi_4k_pass41": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass42": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass43": [
+      "DXIL",
+      "PSV0p",
+      "STAT"
+    ],
+    "mlfi_4k_pass44": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass45": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass46": [
+      "DXIL",
+      "PSV0p",
+      "STAT"
+    ],
+    "mlfi_4k_pass47": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass48": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass49": [
+      "DXIL",
+      "PSV0p",
+      "STAT"
+    ],
+    "mlfi_4k_pass5": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass50": [
+      "DXIL",
+      "PSV0",
+      "STATt"
+    ],
+    "mlfi_4k_pass51": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass52": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass53": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass54": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass55": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass56": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass57": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass58": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass59": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass6": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass60": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass61": [
+      "DXIL",
+      "PSV0",
+      "STATl"
+    ],
+    "mlfi_4k_pass62": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass63": [
+      "DXIL",
+      "PSV0",
+      "STATh"
+    ],
+    "mlfi_4k_pass64": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass65": [
+      "DXIL",
+      "PSV0",
+      "STATh"
+    ],
+    "mlfi_4k_pass66": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass67": [
+      "DXIL",
+      "PSV0",
+      "STATh"
+    ],
+    "mlfi_4k_pass68": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass69": [
+      "DXIL",
+      "PSV0",
+      "STATh"
+    ],
+    "mlfi_4k_pass7": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass70": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass71": [
+      "DXIL",
+      "PSV0",
+      "STATh"
+    ],
+    "mlfi_4k_pass72": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass73": [
+      "DXIL",
+      "PSV0",
+      "STATh"
+    ],
+    "mlfi_4k_pass74": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass75": [
+      "DXIL",
+      "PSV0",
+      "STATh"
+    ],
+    "mlfi_4k_pass76": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass77": [
+      "DXIL",
+      "PSV0",
+      "STATh"
+    ],
+    "mlfi_4k_pass78": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass79": [
+      "DXIL",
+      "PSV0",
+      "STATp"
+    ],
+    "mlfi_4k_pass8": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass80": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass81": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass82": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass83": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass84": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass85": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass86": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass87": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass88": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass89": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass9": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass90": [
+      "DXIL",
+      "PSV0",
+      "STATl"
+    ],
+    "mlfi_4k_pass91": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass92": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass93": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass94": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass95": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass96": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass97": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass98": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_4k_pass99": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass0": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass1": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass10": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass100": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass101": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass102": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass103": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass104": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass105": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass106": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass107": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass108": [
+      "DXIL",
+      "PSV0",
+      "STATp"
+    ],
+    "mlfi_8k_pass109": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass11": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass110": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass111": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass112": [
+      "DXIL",
+      "PSV0",
+      "STATl"
+    ],
+    "mlfi_8k_pass113": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass114": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass115": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass116": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass117": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass118": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass119": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass12": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass120": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass121": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass122": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass123": [
+      "DXIL",
+      "PSV0t",
+      "STAT"
+    ],
+    "mlfi_8k_pass124": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass125": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass126": [
+      "DXIL",
+      "PSV0t",
+      "STAT"
+    ],
+    "mlfi_8k_pass127": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass128": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass129": [
+      "DXIL",
+      "PSV0t",
+      "STAT"
+    ],
+    "mlfi_8k_pass13": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass130": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass131": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass132": [
+      "DXIL",
+      "PSV0t",
+      "STAT"
+    ],
+    "mlfi_8k_pass133": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass134": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass135": [
+      "DXIL",
+      "PSV0t",
+      "STAT"
+    ],
+    "mlfi_8k_pass136": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass137": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass138": [
+      "DXIL",
+      "PSV0t",
+      "STAT"
+    ],
+    "mlfi_8k_pass139": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass14": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass140": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass141": [
+      "DXIL",
+      "PSV0t",
+      "STAT"
+    ],
+    "mlfi_8k_pass142": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass143": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass144": [
+      "DXIL",
+      "PSV0t",
+      "STAT"
+    ],
+    "mlfi_8k_pass145": [
+      "DXIL",
+      "PSV0",
+      "STATp"
+    ],
+    "mlfi_8k_pass146": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass147": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass148": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass149": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass15": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass150": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass151": [
+      "DXIL",
+      "PSV0",
+      "STATl"
+    ],
+    "mlfi_8k_pass152": [
+      "DXIL",
+      "PSV0L",
+      "STAT"
+    ],
+    "mlfi_8k_pass153": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass154": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass155": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass156": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass157": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass158": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass159": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass16": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass160": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass161": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass162": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass163": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass164": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass165": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass166": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass167": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass168": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass169": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass17": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass170": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass171": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass172": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass173": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass174": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass175": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass176": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass177": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass178": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass179": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass18": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass180": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass181": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass182": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass183": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass184": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass185": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass186": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass187": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass188": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass189": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass19": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass190": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass2": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass20": [
+      "DXIL",
+      "PSV0",
+      "STATl"
+    ],
+    "mlfi_8k_pass21": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass22": [
+      "DXIL",
+      "PSV0",
+      "STATp"
+    ],
+    "mlfi_8k_pass23": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass24": [
+      "DXIL",
+      "PSV0",
+      "STATl"
+    ],
+    "mlfi_8k_pass25": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass26": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass27": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass28": [
+      "DXIL",
+      "PSV0p",
+      "STAT"
+    ],
+    "mlfi_8k_pass29": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass3": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass30": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass31": [
+      "DXIL",
+      "PSV0p",
+      "STAT"
+    ],
+    "mlfi_8k_pass32": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass33": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass34": [
+      "DXIL",
+      "PSV0p",
+      "STAT"
+    ],
+    "mlfi_8k_pass35": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass36": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass37": [
+      "DXIL",
+      "PSV0p",
+      "STAT"
+    ],
+    "mlfi_8k_pass38": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass39": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass4": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass40": [
+      "DXIL",
+      "PSV0p",
+      "STAT"
+    ],
+    "mlfi_8k_pass41": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass42": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass43": [
+      "DXIL",
+      "PSV0p",
+      "STAT"
+    ],
+    "mlfi_8k_pass44": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass45": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass46": [
+      "DXIL",
+      "PSV0p",
+      "STAT"
+    ],
+    "mlfi_8k_pass47": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass48": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass49": [
+      "DXIL",
+      "PSV0p",
+      "STAT"
+    ],
+    "mlfi_8k_pass5": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass50": [
+      "DXIL",
+      "PSV0",
+      "STATt"
+    ],
+    "mlfi_8k_pass51": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass52": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass53": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass54": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass55": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass56": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass57": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass58": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass59": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass6": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass60": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass61": [
+      "DXIL",
+      "PSV0",
+      "STATl"
+    ],
+    "mlfi_8k_pass62": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass63": [
+      "DXIL",
+      "PSV0",
+      "STATh"
+    ],
+    "mlfi_8k_pass64": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass65": [
+      "DXIL",
+      "PSV0",
+      "STATh"
+    ],
+    "mlfi_8k_pass66": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass67": [
+      "DXIL",
+      "PSV0",
+      "STATh"
+    ],
+    "mlfi_8k_pass68": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass69": [
+      "DXIL",
+      "PSV0",
+      "STATh"
+    ],
+    "mlfi_8k_pass7": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass70": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass71": [
+      "DXIL",
+      "PSV0",
+      "STATh"
+    ],
+    "mlfi_8k_pass72": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass73": [
+      "DXIL",
+      "PSV0",
+      "STATh"
+    ],
+    "mlfi_8k_pass74": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass75": [
+      "DXIL",
+      "PSV0",
+      "STATh"
+    ],
+    "mlfi_8k_pass76": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass77": [
+      "DXIL",
+      "PSV0",
+      "STATh"
+    ],
+    "mlfi_8k_pass78": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass79": [
+      "DXIL",
+      "PSV0",
+      "STATp"
+    ],
+    "mlfi_8k_pass8": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass80": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass81": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass82": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass83": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass84": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass85": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass86": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass87": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass88": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass89": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass9": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass90": [
+      "DXIL",
+      "PSV0",
+      "STATl"
+    ],
+    "mlfi_8k_pass91": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass92": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass93": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass94": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass95": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass96": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass97": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass98": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ],
+    "mlfi_8k_pass99": [
+      "DXIL",
+      "PSV0",
+      "STAT"
+    ]
+  },
+  "schema": "helix.fsr-metal.fsr4-graph-extraction.v1",
+  "source_binary": {
+    "bytes": 65657608,
+    "executed": false,
+    "path": "/tmp/fsr4-dl/file.bin",
+    "sha256": "4e7dc37aebea3a90e3d3cc43e24cb2b54176b2535315f20dbe63b3b7cfc56b1e"
+  },
+  "why_shapes_matter": "A Metal port needs per tensor (height, width, in_channels, out_channels) and the consumption order. The layer order and the resource bindings are now known; the dimensions are the remaining gap, and they are the only thing standing between this and a loadable FSR4 graph."
+}

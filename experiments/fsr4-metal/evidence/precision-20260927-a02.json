@@ -1,0 +1,344 @@
+{
+  "absolute_timing_caveat" : "absolute milliseconds are NOT reproducible on this host: the same binary lands in two GPU clock states 2-4x apart and all variants move together within a run. Compare same-run ratios only.",
+  "crossover_interop_tested" : false,
+  "device" : "Apple M3 Max",
+  "fp16_numerics" : "measured error reported; half arithmetic is NOT claimed exact",
+  "full_fsr_implemented" : false,
+  "gpu_timing_scope" : "one command buffer, one or two encoders; excludes compile, allocation, packing, CPU reference and readback",
+  "int8_numerics" : "exact against an independent Int64\/Double dyadic oracle",
+  "interpretation_rules" : [
+    "INT8 output is exactly reproducible; FP16 output is only near its oracle.",
+    "FP16 speed does not imply FP16 is numerically adequate for a real model; that needs operator sensitivity data.",
+    "These are our own synthetic operators, not AMD FSR operators, on a uniform synthetic distribution, not real activation statistics.",
+    "A win here does not establish a win for a game frame."
+  ],
+  "os" : "Version 26.6.2 (Build 25G83)",
+  "picture_quality_measured" : false,
+  "question" : "on identical shapes and identical underlying values, is an FP16 path faster or more accurate than the scalar INT8 path on this host?",
+  "real_model_weights" : false,
+  "repeats" : 31,
+  "results" : [
+    {
+      "elements_checked" : 441,
+      "fixture" : "tail_3x3",
+      "fp16_f32acc" : {
+        "gpu_max_ms" : 0.029208342311903834,
+        "gpu_median_ms" : 0.024208333343267441,
+        "gpu_min_ms" : 0.023874992621131241,
+        "gpu_p95_ms" : 0.024499997380189598,
+        "max_abs_vs_fp32_path" : 0.0023875236511230469,
+        "max_abs_vs_oracle" : 0.00390625,
+        "tail_guard_passed" : true
+      },
+      "fp16_halfacc" : {
+        "gpu_max_ms" : 0.024125009076669812,
+        "gpu_median_ms" : 0.023958331439644098,
+        "gpu_min_ms" : 0.023791668354533613,
+        "gpu_p95_ms" : 0.024124994524754584,
+        "max_abs_vs_oracle" : 0.1015625,
+        "max_rel_vs_oracle" : 15.448275566101074,
+        "tail_guard_passed" : true
+      },
+      "fp16_simd8x8" : {
+        "eligible" : false,
+        "measured" : false,
+        "reason" : "kernel implements 1x1 only; this shape is k=3 stride=1 pad=1; spatial=63 not a multiple of 8; outputs=7 not a multiple of 8; channels=5 not a multiple of 8"
+      },
+      "fp32" : {
+        "gpu_max_ms" : 0.026499998057261109,
+        "gpu_median_ms" : 0.026124995201826096,
+        "gpu_min_ms" : 0.025916669983416796,
+        "gpu_p95_ms" : 0.026458335923962295,
+        "max_abs_vs_oracle" : 9.5367431640625e-07,
+        "max_rel_vs_oracle" : 1.7076052245101891e-05,
+        "tail_guard_passed" : true
+      },
+      "input_nhwc" : [
+        1,
+        7,
+        9,
+        5
+      ],
+      "int8_split" : {
+        "dispatches" : 2,
+        "exact" : true,
+        "gpu_max_ms" : 0.031208342988975346,
+        "gpu_median_ms" : 0.027500005671754479,
+        "gpu_min_ms" : 0.026875000912696123,
+        "gpu_p95_ms" : 0.031000003218650818
+      },
+      "output_nhwc" : [
+        1,
+        7,
+        9,
+        7
+      ]
+    },
+    {
+      "elements_checked" : 294912,
+      "fixture" : "feature_1x1",
+      "fp16_f32acc" : {
+        "gpu_max_ms" : 0.21595832367893308,
+        "gpu_median_ms" : 0.21108333021402359,
+        "gpu_min_ms" : 0.20974999642930925,
+        "gpu_p95_ms" : 0.2152499946532771,
+        "max_abs_vs_fp32_path" : 0.0034489631652832031,
+        "max_abs_vs_oracle" : 0.0078125,
+        "tail_guard_passed" : true
+      },
+      "fp16_halfacc" : {
+        "gpu_max_ms" : 0.21587499941233546,
+        "gpu_median_ms" : 0.21095832926221192,
+        "gpu_min_ms" : 0.20983333524782211,
+        "gpu_p95_ms" : 0.21554167324211448,
+        "max_abs_vs_oracle" : 0.0703125,
+        "max_rel_vs_oracle" : 50.270717620849609,
+        "tail_guard_passed" : true
+      },
+      "fp16_simd8x8" : {
+        "bitwise_exact" : false,
+        "eligible" : true,
+        "gpu_max_ms" : 0.10162500257138163,
+        "gpu_median_ms" : 0.10049999400507659,
+        "gpu_min_ms" : 0.099874989246018231,
+        "gpu_p95_ms" : 0.1012083375826478,
+        "max_abs_vs_exact_half_sum" : 0.015104770660400391,
+        "max_ulp_at_tensor_magnitude" : 1.93341064453125,
+        "measured" : true,
+        "tail_guard_passed" : true,
+        "ulp_budget" : 16,
+        "within_budget" : true
+      },
+      "fp32" : {
+        "gpu_max_ms" : 0.21587499941233546,
+        "gpu_median_ms" : 0.2116666582878679,
+        "gpu_min_ms" : 0.21124999329913408,
+        "gpu_p95_ms" : 0.21562499750871211,
+        "max_abs_vs_oracle" : 1.430511474609375e-06,
+        "max_rel_vs_oracle" : 0.0014902270631864667,
+        "tail_guard_passed" : true
+      },
+      "input_nhwc" : [
+        1,
+        72,
+        128,
+        32
+      ],
+      "int8_split" : {
+        "dispatches" : 2,
+        "exact" : true,
+        "gpu_max_ms" : 0.23462499666493386,
+        "gpu_median_ms" : 0.23099999816622585,
+        "gpu_min_ms" : 0.23058333317749202,
+        "gpu_p95_ms" : 0.23445833357982337
+      },
+      "output_nhwc" : [
+        1,
+        72,
+        128,
+        32
+      ]
+    },
+    {
+      "elements_checked" : 294912,
+      "fixture" : "feature_3x3",
+      "fp16_f32acc" : {
+        "gpu_max_ms" : 0.6874999962747097,
+        "gpu_median_ms" : 0.68537499464582652,
+        "gpu_min_ms" : 0.68287500471342355,
+        "gpu_p95_ms" : 0.68687499151565135,
+        "max_abs_vs_fp32_path" : 0.012969970703125,
+        "max_abs_vs_oracle" : 0.015625,
+        "tail_guard_passed" : true
+      },
+      "fp16_halfacc" : {
+        "gpu_max_ms" : 1.2246249971212819,
+        "gpu_median_ms" : 0.68604167609009892,
+        "gpu_min_ms" : 0.68425000063143671,
+        "gpu_p95_ms" : 0.68937501055188477,
+        "max_abs_vs_oracle" : 1.515625,
+        "max_rel_vs_oracle" : 1434.3929443359375,
+        "tail_guard_passed" : true
+      },
+      "fp16_simd8x8" : {
+        "eligible" : false,
+        "measured" : false,
+        "reason" : "kernel implements 1x1 only; this shape is k=3 stride=1 pad=1"
+      },
+      "fp32" : {
+        "gpu_max_ms" : 0.64125000790227205,
+        "gpu_median_ms" : 0.63970833434723318,
+        "gpu_min_ms" : 0.63641666201874614,
+        "gpu_p95_ms" : 0.64112500695046037,
+        "max_abs_vs_oracle" : 9.5367431640625e-06,
+        "max_rel_vs_oracle" : 0.0098224375396966934,
+        "tail_guard_passed" : true
+      },
+      "input_nhwc" : [
+        1,
+        72,
+        128,
+        32
+      ],
+      "int8_split" : {
+        "dispatches" : 2,
+        "exact" : true,
+        "gpu_max_ms" : 0.36424999416340142,
+        "gpu_median_ms" : 0.36333333991933614,
+        "gpu_min_ms" : 0.35958332591690123,
+        "gpu_p95_ms" : 0.36412500776350498
+      },
+      "output_nhwc" : [
+        1,
+        72,
+        128,
+        32
+      ]
+    },
+    {
+      "elements_checked" : 73728,
+      "fixture" : "feature_stride2",
+      "fp16_f32acc" : {
+        "gpu_max_ms" : 0.061500002630054951,
+        "gpu_median_ms" : 0.055958327720873058,
+        "gpu_min_ms" : 0.055708325817249715,
+        "gpu_p95_ms" : 0.061083323089405894,
+        "max_abs_vs_fp32_path" : 0.0061664581298828125,
+        "max_abs_vs_oracle" : 0.015625,
+        "tail_guard_passed" : true
+      },
+      "fp16_halfacc" : {
+        "gpu_max_ms" : 0.061083337641321123,
+        "gpu_median_ms" : 0.056041666539385915,
+        "gpu_min_ms" : 0.055583339417353272,
+        "gpu_p95_ms" : 0.060500009567476809,
+        "max_abs_vs_oracle" : 0.453125,
+        "max_rel_vs_oracle" : 302.1851806640625,
+        "tail_guard_passed" : true
+      },
+      "fp16_simd8x8" : {
+        "eligible" : false,
+        "measured" : false,
+        "reason" : "kernel implements 1x1 only; this shape is k=2 stride=2 pad=0"
+      },
+      "fp32" : {
+        "gpu_max_ms" : 0.058874997193925083,
+        "gpu_median_ms" : 0.053499999921768904,
+        "gpu_min_ms" : 0.052916657296009362,
+        "gpu_p95_ms" : 0.05883332050871104,
+        "max_abs_vs_oracle" : 3.814697265625e-06,
+        "max_rel_vs_oracle" : 0.0019935986492782831,
+        "tail_guard_passed" : true
+      },
+      "input_nhwc" : [
+        1,
+        73,
+        129,
+        32
+      ],
+      "int8_split" : {
+        "dispatches" : 2,
+        "exact" : true,
+        "gpu_max_ms" : 0.055958327720873058,
+        "gpu_median_ms" : 0.055416661780327559,
+        "gpu_min_ms" : 0.051833339966833591,
+        "gpu_p95_ms" : 0.055750002502463758
+      },
+      "output_nhwc" : [
+        1,
+        36,
+        64,
+        32
+      ]
+    },
+    {
+      "elements_checked" : 262144,
+      "fixture" : "wide_1x1",
+      "fp16_f32acc" : {
+        "gpu_max_ms" : 0.087249994976446033,
+        "gpu_median_ms" : 0.086625004769302905,
+        "gpu_min_ms" : 0.086374988313764334,
+        "gpu_p95_ms" : 0.087249994976446033,
+        "max_abs_vs_fp32_path" : 0.0058374404907226562,
+        "max_abs_vs_oracle" : 0.0078125,
+        "tail_guard_passed" : true
+      },
+      "fp16_halfacc" : {
+        "gpu_max_ms" : 0.087791660916991532,
+        "gpu_median_ms" : 0.086708329035900533,
+        "gpu_min_ms" : 0.085708335973322392,
+        "gpu_p95_ms" : 0.087499996880069375,
+        "max_abs_vs_oracle" : 0.203125,
+        "max_rel_vs_oracle" : 160.88571166992188,
+        "tail_guard_passed" : true
+      },
+      "fp16_simd8x8" : {
+        "bitwise_exact" : false,
+        "eligible" : true,
+        "gpu_max_ms" : 0.039583334000781178,
+        "gpu_median_ms" : 0.039125006878748536,
+        "gpu_min_ms" : 0.038791666156612337,
+        "gpu_p95_ms" : 0.039499995182268322,
+        "max_abs_vs_exact_half_sum" : 0.033548355102539062,
+        "max_ulp_at_tensor_magnitude" : 4.294189453125,
+        "measured" : true,
+        "tail_guard_passed" : true,
+        "ulp_budget" : 32,
+        "within_budget" : true
+      },
+      "fp32" : {
+        "gpu_max_ms" : 0.081625010352581739,
+        "gpu_median_ms" : 0.081374993897043169,
+        "gpu_min_ms" : 0.080833342508412898,
+        "gpu_p95_ms" : 0.081624995800666511,
+        "max_abs_vs_oracle" : 2.86102294921875e-06,
+        "max_rel_vs_oracle" : 0.0063516818918287754,
+        "tail_guard_passed" : true
+      },
+      "input_nhwc" : [
+        1,
+        64,
+        64,
+        64
+      ],
+      "int8_split" : {
+        "dispatches" : 2,
+        "exact" : true,
+        "gpu_max_ms" : 0.094250004622153938,
+        "gpu_median_ms" : 0.093624999863095582,
+        "gpu_min_ms" : 0.092666668933816254,
+        "gpu_p95_ms" : 0.094000002718530595
+      },
+      "output_nhwc" : [
+        1,
+        64,
+        64,
+        64
+      ]
+    }
+  ],
+  "schema" : "helix.fsr-metal.precision-arena.v1",
+  "scope" : "synthetic_operator_precision_comparison",
+  "simdgroup_matrix_available" : true,
+  "simdgroup_shapes_exact" : 0,
+  "simdgroup_shapes_measured" : 2,
+  "source_and_binary_sha256" : {
+    ".build\/precision-lab" : "3e3b0295a0ebc8c6b89afebd415204ee3219ffd81fa06f5daacfd07935793a97",
+    "kernels\/conv_i8.metal" : "468d3b53c85641bbfe4a8aec4b8bca1809254182d2c4eb753ab947addf0a1f6d",
+    "kernels\/epilogue.metal" : "b38fff3426124a5d234a7e82d6c49fdfa94e9aaad99293f74b3abb341e4f3d2b",
+    "kernels\/precision_arena.metal" : "7bbf41244a9e7ec00e3b2cae85848a5f894632031c752475c457bf3d4635aef2",
+    "native\/PrecisionLab.swift" : "e0047e544287cd13ee7314f3dd9cdffd82810cdf79045e7484e5e9bae612301f"
+  },
+  "student_precision_chosen" : false,
+  "thermal_state_at_end" : 0,
+  "utc_timestamp" : "2026-09-27T15:58:03Z",
+  "variant_timing_protocol" : "all variants interleaved inside one trial loop, order alternated per trial, so a clock shift cannot land inside a single variant",
+  "variants" : {
+    "fp16_f32acc" : "single dispatch, half storage with float32 accumulator, half output",
+    "fp16_halfacc" : "single dispatch, half accumulator; products and partial sums rounded to half each step",
+    "fp16_simd8x8" : "1x1 only: 8x8 simdgroup matrix multiply over the flattened spatial axis",
+    "fp32" : "single dispatch, float32 accumulate",
+    "int8_split" : "signed INT8 packed-four convolution + separate dyadic requantisation (existing path)"
+  },
+  "warmup" : 10
+}
